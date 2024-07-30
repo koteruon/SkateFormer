@@ -1,10 +1,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
+import logging
 import os
 import os.path as osp
-import numpy as np
 import pickle
-import logging
+
+import numpy as np
 
 root_path = './'
 raw_data_file = osp.join(root_path, 'raw_data', 'raw_skes_data.pkl')
@@ -425,7 +426,7 @@ def get_raw_denoised_data():
     with open(raw_skes_colors_pkl, 'wb') as f:
         pickle.dump(raw_denoised_colors, f, pickle.HIGHEST_PROTOCOL)
 
-    frames_cnt = np.array(frames_cnt, dtype=np.int)
+    frames_cnt = np.array(frames_cnt, dtype=np.int32)
     np.savetxt(osp.join(save_path, 'frames_cnt.txt'), frames_cnt, fmt='%d')
 
     print('Saved raw denoised positions of {} frames into {}'.format(np.sum(frames_cnt),

@@ -1,0 +1,41 @@
+# compilation and distribution
+__pycache__
+_ext
+*.pyc
+*.so
+*.egg-info/
+build/
+dist/
+
+# pytorch/python/numpy formats
+*.pth
+*.pkl
+*.npy
+*.npz
+*.pt
+*.out
+*.zip
+
+# ipython/jupyter notebooks
+*.ipynb
+**/.ipynb_checkpoints/
+
+# Editor temporaries
+*.swn
+*.swo
+*.swp
+*~
+.DS_Store
+.vscode
+.flake
+
+# Pycharm editor settings
+.idea
+
+work_dir
+
+data/nturgbd_raw
+data/NW-UCLA
+data/ntu/denoised_data
+data/ntu/raw_data
+
