@@ -3,7 +3,7 @@ import random
 import numpy as np
 from torch.utils.data import Dataset
 
-from feeders import tools
+from feeders import table_tennis_tools
 
 
 class Feeder(Dataset):
@@ -39,16 +39,15 @@ class Feeder(Dataset):
         self.partition = partition
         self.load_data()
         if partition:
-            self.right_arm = np.array([7, 8, 22, 23]) - 1
-            self.left_arm = np.array([11, 12, 24, 25]) - 1
-            self.right_leg = np.array([13, 14, 15, 16]) - 1
-            self.left_leg = np.array([17, 18, 19, 20]) - 1
-            self.h_torso = np.array([5, 9, 6, 10]) - 1
-            self.w_torso = np.array([2, 3, 1, 4]) - 1
+            self.right_arm = np.array([11, 12, 13])
+            self.left_arm = np.array([14, 15, 16])
+            self.right_leg = np.array([4, 5, 6])
+            self.left_leg = np.array([1, 2, 3])
+            self.torso = np.array([7, 9, 0, 10])
             self.new_idx = np.concatenate(
-                (self.right_arm, self.left_arm, self.right_leg, self.left_leg, self.h_torso, self.w_torso), axis=-1
+                (self.right_arm, self.left_arm, self.right_leg, self.left_leg, self.torso), axis=-1
             )
-            # except for joint no.21
+            # except for joint no.8
 
     def load_data(self):
         # data: N C V T M
@@ -64,7 +63,7 @@ class Feeder(Dataset):
         else:
             raise NotImplementedError("data split only supports train/test")
         N, T, _ = self.data.shape
-        self.data = self.data.reshape((N, T, 2, 25, 3)).transpose(0, 4, 1, 3, 2)
+        self.data = self.data.reshape((N, T, 1, 17, 3)).transpose(0, 4, 1, 3, 2)
 
     def __len__(self):
         return len(self.label)
@@ -80,11 +79,11 @@ class Feeder(Dataset):
         num_people = np.sum(data_numpy.sum(0).sum(0).sum(0) != 0)
 
         if self.uniform:
-            data_numpy, index_t = tools.valid_crop_uniform(
+            data_numpy, index_t = table_tennis_tools.valid_crop_uniform(
                 data_numpy, valid_frame_num, self.p_interval, self.window_size, self.thres
             )
         else:
-            data_numpy, index_t = tools.valid_crop_resize(
+            data_numpy, index_t = table_tennis_tools.valid_crop_resize(
                 data_numpy, valid_frame_num, self.p_interval, self.window_size, self.thres
             )
 
@@ -106,24 +105,28 @@ class Feeder(Dataset):
                             temp[:, :, :, axis_next] = x_new
                             data_numpy = temp
 
-                if "1" in self.aug_method:
-                    data_numpy = tools.shear(data_numpy, p=0.5)
-                if "2" in self.aug_method:
-                    data_numpy = tools.rotate(data_numpy, p=0.5)
-                if "3" in self.aug_method:
-                    data_numpy = tools.scale(data_numpy, p=0.5)
-                if "4" in self.aug_method:
-                    data_numpy = tools.spatial_flip(data_numpy, p=0.5)
-                if "5" in self.aug_method:
-                    data_numpy, index_t = tools.temporal_flip(data_numpy, index_t, p=0.5)
-                if "6" in self.aug_method:
-                    data_numpy = tools.gaussian_noise(data_numpy, p=0.5)
-                if "7" in self.aug_method:
-                    data_numpy = tools.gaussian_filter(data_numpy, p=0.5)
-                if "8" in self.aug_method:
-                    data_numpy = tools.drop_axis(data_numpy, p=0.5)
-                if "9" in self.aug_method:
-                    data_numpy = tools.drop_joint(data_numpy, p=0.5)
+                if "1" in self.aug_method:  # 隨機的剪切變換
+                    data_numpy = table_tennis_tools.shear(data_numpy, p=0.5)
+                if "2" in self.aug_method:  # 隨機旋轉
+                    data_numpy = table_tennis_tools.rotate(data_numpy, p=0.5)
+                if "3" in self.aug_method:  # 隨機縮放
+                    data_numpy = table_tennis_tools.scale(data_numpy, p=0.5)
+                if "4" in self.aug_method:  # 隨機進行空間上的翻轉
+                    data_numpy = table_tennis_tools.spatial_flip(data_numpy, p=0.5)
+                if "5" in self.aug_method:  # 隨機進行時間上的翻轉
+                    data_numpy, index_t = table_tennis_tools.temporal_flip(data_numpy, index_t, p=0.5)
+                if "6" in self.aug_method:  # 隨機增加高斯雜訊
+                    data_numpy = table_tennis_tools.gaussian_noise(data_numpy, p=0.5)
+                if "7" in self.aug_method:  # 隨機高斯模糊的卷積操作
+                    data_numpy = table_tennis_tools.gaussian_filter(data_numpy, p=0.5)
+                if "8" in self.aug_method:  # 某一個空間維度上進行“丟棄”操作
+                    data_numpy = table_tennis_tools.drop_axis(data_numpy, p=0.5)
+                if "9" in self.aug_method:  # 隨機丟棄骨架數據中的某些關鍵點，在指定的時間範圍內
+                    joint_list = random.randint(1, 10)
+                    time_range = random.randint(4, 8)
+                    data_numpy = table_tennis_tools.drop_joint(
+                        data_numpy, joint_list=joint_list, time_range=time_range, p=0.5
+                    )
 
             # inter-instance augmentation
             elif (p < (self.intra_p + self.inter_p)) & (p >= self.intra_p):
@@ -133,21 +136,21 @@ class Feeder(Dataset):
                 f_num = np.sum(data_adain.sum(0).sum(-1).sum(-1) != 0)
                 t_idx = np.round((index_t + 1) * f_num / 2).astype(np.int)
                 data_adain = data_adain[:, t_idx]
-                data_numpy = tools.skeleton_adain_bone_length(data_numpy, data_adain)
+                data_numpy = table_tennis_tools.skeleton_adain_bone_length(data_numpy, data_adain)
 
             else:
                 data_numpy = data_numpy.copy()
 
         # modality
         if self.data_type == "b":
-            j2b = tools.joint2bone()
+            j2b = table_tennis_tools.joint2bone()
             data_numpy = j2b(data_numpy)
         elif self.data_type == "jm":
-            data_numpy = tools.to_motion(data_numpy)
+            data_numpy = table_tennis_tools.to_motion(data_numpy)
         elif self.data_type == "bm":
-            j2b = tools.joint2bone()
+            j2b = table_tennis_tools.joint2bone()
             data_numpy = j2b(data_numpy)
-            data_numpy = tools.to_motion(data_numpy)
+            data_numpy = table_tennis_tools.to_motion(data_numpy)
         else:
             data_numpy = data_numpy.copy()
 

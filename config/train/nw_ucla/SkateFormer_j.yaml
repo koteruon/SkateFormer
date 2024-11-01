@@ -59,4 +59,4 @@ num_epoch: 500
 nesterov: True
 grad_clip: True
 grad_max: 1.0
-loss_type: LSCE
+loss_type: LSCE #LSCE
