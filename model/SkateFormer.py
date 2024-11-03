@@ -437,6 +437,7 @@ class SkateFormer(nn.Module):
         norm_layer_transformer=nn.LayerNorm,
         index_t=False,
         global_pool="avg",
+        koopman_pooling=False,
     ):
 
         super(SkateFormer, self).__init__()
@@ -517,7 +518,11 @@ class SkateFormer(nn.Module):
         self.head = nn.Linear(channels[-1], num_classes)
 
         # Koopman pooling
-        self.K = nn.Parameter(torch.randn((num_classes, channels[-1], channels[-1])))
+        self.koopman_pooling = koopman_pooling
+        if self.koopman_pooling:
+            self.depths = depths
+            self.channels = channels
+            self.K = nn.Parameter(torch.randn((num_classes, channels[-1], channels[-1])))
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -567,24 +572,24 @@ class SkateFormer(nn.Module):
         # 应用主特征提取和头部
         output = self.forward_features(output)
 
-        # 引入 Koopman Pooling 进行动态特征抽取
-        output = output.view(B, C * T, 8, M, V)
-        output = output.permute(0, 3, 1, 2, 4)  # [B, M, C, T, V]
-        output = output.mean(-1).mean(1)
-        x1 = output[:, :, :-1]  # x1 为移除最后一个时间步
-        x2 = output[:, :, 1:]  # x2 为移除第一个时间步
+        if self.koopman_pooling:
+            # 引入 Koopman Pooling 进行动态特征抽取
+            output = output.view(B, self.channels[-1], T // (2 ** (len(self.depths) - 1)), M, V)
+            output = output.permute(0, 3, 1, 2, 4)  # [B, M, C, T, V]
+            output = output.mean(-1).mean(1)
+            x1 = output[:, :, :-1]  # x1 为移除最后一个时间步
+            x2 = output[:, :, 1:]  # x2 为移除第一个时间步
 
-        koopman_out = (torch.einsum("cij, bjt -> bcit", self.K, x1) - x2.unsqueeze(1)).norm(dim=-2).mean(dim=-1)
-        koopman_out = -koopman_out  # 负号处理
-        output = koopman_out
+            koopman_out = (torch.einsum("cij, bjt -> bcit", self.K, x1) - x2.unsqueeze(1)).norm(dim=-2).mean(dim=-1)
+            koopman_out = -koopman_out  # 负号处理
+            output = koopman_out
 
-        if self.dropout is not None:
-            output = self.dropout(output)
-        return output
-
-        # 进一步传入网络头部
-        # output = self.forward_head(output)
-        # return output
+            if self.dropout is not None:
+                output = self.dropout(output)
+            return output
+        else:
+            output = self.forward_head(output)
+            return output
 
 
 def SkateFormer_(**kwargs):
