@@ -46,7 +46,8 @@ model_args:
   type_3_size: [8, 8]
   type_4_size: [8, 12]
   mlp_ratio: 4.0
-  index_t: True
+  index_t: None
+  koopman_pooling: True
 
 #optim
 optimizer: AdamW

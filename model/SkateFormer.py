@@ -478,7 +478,9 @@ class SkateFormer(nn.Module):
         )
         self.stem = nn.ModuleList(stem)
 
-        if self.index_t:
+        if self.index_t == "None":
+            pass
+        elif self.index_t:
             self.joint_person_embedding = nn.Parameter(torch.zeros(embed_dim, num_points * num_people))
             trunc_normal_(self.joint_person_embedding, std=0.02)
         else:
@@ -520,9 +522,9 @@ class SkateFormer(nn.Module):
         # Koopman pooling
         self.koopman_pooling = koopman_pooling
         if self.koopman_pooling:
+            self.K = nn.Parameter(torch.randn((num_classes, channels[-1], channels[-1])))
             self.depths = depths
             self.channels = channels
-            self.K = nn.Parameter(torch.randn((num_classes, channels[-1], channels[-1])))
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -559,7 +561,9 @@ class SkateFormer(nn.Module):
         output = input.permute(0, 1, 2, 4, 3).contiguous().view(B, C, T, -1)  # [B, C, T, M * V]
         for layer in self.stem:
             output = layer(output)
-        if self.index_t:
+        if self.index_t == "None":
+            pass
+        elif self.index_t:
             te = torch.zeros(B, T, self.embed_dim).to(output.device)  # B, T, C
             div_term = torch.exp(
                 (torch.arange(0, self.embed_dim, 2, dtype=torch.float) * -(math.log(10000.0) / self.embed_dim))
