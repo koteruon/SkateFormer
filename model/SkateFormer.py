@@ -1,12 +1,20 @@
-from typing import Type, Tuple, Optional, Set, List, Union
-
 import math
+from typing import List, Optional, Set, Tuple, Type, Union
+
 import numpy as np
 import torch
 import torch.nn as nn
-from timm.models.layers import drop_path, trunc_normal_, Mlp, DropPath, create_act_layer, get_norm_act_layer, create_conv2d
+from timm.models.layers import (
+    DropPath,
+    Mlp,
+    create_act_layer,
+    create_conv2d,
+    drop_path,
+    get_norm_act_layer,
+    trunc_normal_,
+)
 
-''' Partition and Reverse '''
+""" Partition and Reverse """
 
 
 def type_1_partition(input, partition_size):  # partition_size = [N, L]
@@ -19,7 +27,9 @@ def type_1_partition(input, partition_size):  # partition_size = [N, L]
 def type_1_reverse(partitions, original_size, partition_size):  # original_size = [T, V]
     T, V = original_size
     B = int(partitions.shape[0] / (T * V / partition_size[0] / partition_size[1]))
-    output = partitions.view(B, T // partition_size[0], V // partition_size[1], partition_size[0], partition_size[1], -1)
+    output = partitions.view(
+        B, T // partition_size[0], V // partition_size[1], partition_size[0], partition_size[1], -1
+    )
     output = output.permute(0, 5, 1, 3, 2, 4).contiguous().view(B, -1, T, V)
     return output
 
@@ -34,7 +44,9 @@ def type_2_partition(input, partition_size):  # partition_size = [N, K]
 def type_2_reverse(partitions, original_size, partition_size):  # original_size = [T, V]
     T, V = original_size
     B = int(partitions.shape[0] / (T * V / partition_size[0] / partition_size[1]))
-    output = partitions.view(B, T // partition_size[0], V // partition_size[1], partition_size[0], partition_size[1], -1)
+    output = partitions.view(
+        B, T // partition_size[0], V // partition_size[1], partition_size[0], partition_size[1], -1
+    )
     output = output.permute(0, 5, 1, 3, 4, 2).contiguous().view(B, -1, T, V)
     return output
 
@@ -49,7 +61,9 @@ def type_3_partition(input, partition_size):  # partition_size = [M, L]
 def type_3_reverse(partitions, original_size, partition_size):  # original_size = [T, V]
     T, V = original_size
     B = int(partitions.shape[0] / (T * V / partition_size[0] / partition_size[1]))
-    output = partitions.view(B, T // partition_size[0], V // partition_size[1], partition_size[0], partition_size[1], -1)
+    output = partitions.view(
+        B, T // partition_size[0], V // partition_size[1], partition_size[0], partition_size[1], -1
+    )
     output = output.permute(0, 5, 3, 1, 2, 4).contiguous().view(B, -1, T, V)
     return output
 
@@ -64,12 +78,14 @@ def type_4_partition(input, partition_size):  # partition_size = [M, K]
 def type_4_reverse(partitions, original_size, partition_size):  # original_size = [T, V]
     T, V = original_size
     B = int(partitions.shape[0] / (T * V / partition_size[0] / partition_size[1]))
-    output = partitions.view(B, T // partition_size[0], V // partition_size[1], partition_size[0], partition_size[1], -1)
+    output = partitions.view(
+        B, T // partition_size[0], V // partition_size[1], partition_size[0], partition_size[1], -1
+    )
     output = output.permute(0, 5, 3, 1, 4, 2).contiguous().view(B, -1, T, V)
     return output
 
 
-''' 1D relative positional bias: B_{h}^{t} '''
+""" 1D relative positional bias: B_{h}^{t} """
 
 
 def get_relative_position_index_1d(T):
@@ -81,44 +97,55 @@ def get_relative_position_index_1d(T):
     return relative_coords.sum(-1)
 
 
-''' MSA '''
+""" MSA """
 
 
 class MultiHeadSelfAttention(nn.Module):
-    def __init__(self, in_channels, rel_type, num_heads=32, partition_size=(1, 1), attn_drop=0., rel=True):
+    def __init__(self, in_channels, rel_type, num_heads=32, partition_size=(1, 1), attn_drop=0.0, rel=True):
         super(MultiHeadSelfAttention, self).__init__()
         self.in_channels = in_channels
         self.rel_type = rel_type
         self.num_heads = num_heads
         self.partition_size = partition_size
-        self.scale = num_heads ** -0.5
+        self.scale = num_heads**-0.5
         self.attn_area = partition_size[0] * partition_size[1]
         self.attn_drop = nn.Dropout(p=attn_drop)
         self.softmax = nn.Softmax(dim=-1)
         self.rel = rel
 
         if self.rel:
-            if self.rel_type == 'type_1' or self.rel_type == 'type_3':
+            if self.rel_type == "type_1" or self.rel_type == "type_3":
                 self.relative_position_bias_table = nn.Parameter(torch.zeros((2 * partition_size[0] - 1), num_heads))
                 self.register_buffer("relative_position_index", get_relative_position_index_1d(partition_size[0]))
-                trunc_normal_(self.relative_position_bias_table, std=.02)
+                trunc_normal_(self.relative_position_bias_table, std=0.02)
                 self.ones = torch.ones(partition_size[1], partition_size[1], num_heads)
-            elif self.rel_type == 'type_2' or self.rel_type == 'type_4':
+            elif self.rel_type == "type_2" or self.rel_type == "type_4":
                 self.relative_position_bias_table = nn.Parameter(
-                    torch.zeros((2 * partition_size[0] - 1), partition_size[1], partition_size[1], num_heads))
+                    torch.zeros((2 * partition_size[0] - 1), partition_size[1], partition_size[1], num_heads)
+                )
                 self.register_buffer("relative_position_index", get_relative_position_index_1d(partition_size[0]))
-                trunc_normal_(self.relative_position_bias_table, std=.02)
+                trunc_normal_(self.relative_position_bias_table, std=0.02)
 
     def _get_relative_positional_bias(self):
-        if self.rel_type == 'type_1' or self.rel_type == 'type_3':
+        if self.rel_type == "type_1" or self.rel_type == "type_3":
             relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
-                self.partition_size[0], self.partition_size[0], -1)
-            relative_position_bias = relative_position_bias.unsqueeze(1).unsqueeze(3).repeat(1, self.partition_size[1], 1, self.partition_size[1], 1, 1).view(self.attn_area, self.attn_area, -1)
+                self.partition_size[0], self.partition_size[0], -1
+            )
+            relative_position_bias = (
+                relative_position_bias.unsqueeze(1)
+                .unsqueeze(3)
+                .repeat(1, self.partition_size[1], 1, self.partition_size[1], 1, 1)
+                .view(self.attn_area, self.attn_area, -1)
+            )
             relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()
             return relative_position_bias.unsqueeze(0)
-        elif self.rel_type == 'type_2' or self.rel_type == 'type_4':
-            relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(self.partition_size[0], self.partition_size[0], self.partition_size[1], self.partition_size[1], -1)
-            relative_position_bias = relative_position_bias.permute(0, 2, 1, 3, 4).contiguous().view(self.attn_area, self.attn_area, -1)
+        elif self.rel_type == "type_2" or self.rel_type == "type_4":
+            relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
+                self.partition_size[0], self.partition_size[0], self.partition_size[1], self.partition_size[1], -1
+            )
+            relative_position_bias = (
+                relative_position_bias.permute(0, 2, 1, 3, 4).contiguous().view(self.attn_area, self.attn_area, -1)
+            )
             relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()
             return relative_position_bias.unsqueeze(0)
 
@@ -136,14 +163,28 @@ class MultiHeadSelfAttention(nn.Module):
         return output
 
 
-''' SkateFormer Block '''
+""" SkateFormer Block """
 
 
 class SkateFormerBlock(nn.Module):
-    def __init__(self, in_channels, num_points=50, kernel_size=7, num_heads=32,
-                 type_1_size=(1, 1), type_2_size=(1, 1), type_3_size=(1, 1), type_4_size=(1, 1),
-                 attn_drop=0., drop=0., rel=True, drop_path=0., mlp_ratio=4.,
-                 act_layer=nn.GELU, norm_layer=nn.LayerNorm):
+    def __init__(
+        self,
+        in_channels,
+        num_points=50,
+        kernel_size=7,
+        num_heads=32,
+        type_1_size=(1, 1),
+        type_2_size=(1, 1),
+        type_3_size=(1, 1),
+        type_4_size=(1, 1),
+        attn_drop=0.0,
+        drop=0.0,
+        rel=True,
+        drop_path=0.0,
+        mlp_ratio=4.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.LayerNorm,
+    ):
         super(SkateFormerBlock, self).__init__()
         self.type_1_size = type_1_size
         self.type_2_size = type_2_size
@@ -152,31 +193,42 @@ class SkateFormerBlock(nn.Module):
         self.partition_function = [type_1_partition, type_2_partition, type_3_partition, type_4_partition]
         self.reverse_function = [type_1_reverse, type_2_reverse, type_3_reverse, type_4_reverse]
         self.partition_size = [type_1_size, type_2_size, type_3_size, type_4_size]
-        self.rel_type = ['type_1', 'type_2', 'type_3', 'type_4']
+        self.rel_type = ["type_1", "type_2", "type_3", "type_4"]
 
         self.norm_1 = norm_layer(in_channels)
         self.mapping = nn.Linear(in_features=in_channels, out_features=2 * in_channels, bias=True)
         self.gconv = nn.Parameter(torch.zeros(num_heads // (2 * 2), num_points, num_points))
-        trunc_normal_(self.gconv, std=.02)
-        self.tconv = nn.Conv2d(in_channels // (2 * 2), in_channels // (2 * 2), kernel_size=(kernel_size, 1),
-                               padding=((kernel_size - 1) // 2, 0), groups=num_heads // (2 * 2))
+        trunc_normal_(self.gconv, std=0.02)
+        self.tconv = nn.Conv2d(
+            in_channels // (2 * 2),
+            in_channels // (2 * 2),
+            kernel_size=(kernel_size, 1),
+            padding=((kernel_size - 1) // 2, 0),
+            groups=num_heads // (2 * 2),
+        )
 
         # Attention layers
         attention = []
         for i in range(len(self.partition_function)):
             attention.append(
-                MultiHeadSelfAttention(in_channels=in_channels // (len(self.partition_function) * 2),
-                                       rel_type=self.rel_type[i],
-                                       num_heads=num_heads // (len(self.partition_function) * 2),
-                                       partition_size=self.partition_size[i], attn_drop=attn_drop, rel=rel))
+                MultiHeadSelfAttention(
+                    in_channels=in_channels // (len(self.partition_function) * 2),
+                    rel_type=self.rel_type[i],
+                    num_heads=num_heads // (len(self.partition_function) * 2),
+                    partition_size=self.partition_size[i],
+                    attn_drop=attn_drop,
+                    rel=rel,
+                )
+            )
         self.attention = nn.ModuleList(attention)
         self.proj = nn.Linear(in_features=in_channels, out_features=in_channels, bias=True)
         self.proj_drop = nn.Dropout(p=drop)
 
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.norm_2 = norm_layer(in_channels)
-        self.mlp = Mlp(in_features=in_channels, hidden_features=int(mlp_ratio * in_channels),
-                       act_layer=act_layer, drop=drop)
+        self.mlp = Mlp(
+            in_features=in_channels, hidden_features=int(mlp_ratio * in_channels), act_layer=act_layer, drop=drop
+        )
 
     def forward(self, input):
         B, C, T, V = input.shape
@@ -195,7 +247,7 @@ class SkateFormerBlock(nn.Module):
         y_gconv = []
         split_f_gconv = torch.chunk(split_f_conv[0], self.gconv.shape[0], dim=1)
         for i in range(self.gconv.shape[0]):
-            z = torch.einsum('n c t u, v u -> n c t v', split_f_gconv[i], self.gconv[i])
+            z = torch.einsum("n c t u, v u -> n c t v", split_f_gconv[i], self.gconv[i])
             y_gconv.append(z)
         y.append(torch.cat(y_gconv, dim=1))  # N C T V
 
@@ -221,7 +273,7 @@ class SkateFormerBlock(nn.Module):
         return output
 
 
-''' Downsampling '''
+""" Downsampling """
 
 
 class PatchMergingTconv(nn.Module):
@@ -230,8 +282,9 @@ class PatchMergingTconv(nn.Module):
         self.dim_in = dim_in
         self.dim_out = dim_out
         pad = (kernel_size + (kernel_size - 1) * (dilation - 1) - 1) // 2
-        self.reduction = nn.Conv2d(dim_in, dim_out, kernel_size=(kernel_size, 1), padding=(pad, 0), stride=(stride, 1),
-                                   dilation=(dilation, 1))
+        self.reduction = nn.Conv2d(
+            dim_in, dim_out, kernel_size=(kernel_size, 1), padding=(pad, 0), stride=(stride, 1), dilation=(dilation, 1)
+        )
         self.bn = nn.BatchNorm2d(dim_out)
 
     def forward(self, x):
@@ -239,15 +292,30 @@ class PatchMergingTconv(nn.Module):
         return x
 
 
-''' SkateFormer Block with Downsampling '''
+""" SkateFormer Block with Downsampling """
 
 
 class SkateFormerBlockDS(nn.Module):
     def __init__(
-            self, in_channels, out_channels, num_points=50, kernel_size=7, downscale=False, num_heads=32,
-            type_1_size=(1, 1), type_2_size=(1, 1), type_3_size=(1, 1), type_4_size=(1, 1),
-            attn_drop=0., drop=0., rel=True, drop_path=0., mlp_ratio=4.,
-            act_layer=nn.GELU, norm_layer_transformer=nn.LayerNorm):
+        self,
+        in_channels,
+        out_channels,
+        num_points=50,
+        kernel_size=7,
+        downscale=False,
+        num_heads=32,
+        type_1_size=(1, 1),
+        type_2_size=(1, 1),
+        type_3_size=(1, 1),
+        type_4_size=(1, 1),
+        attn_drop=0.0,
+        drop=0.0,
+        rel=True,
+        drop_path=0.0,
+        mlp_ratio=4.0,
+        act_layer=nn.GELU,
+        norm_layer_transformer=nn.LayerNorm,
+    ):
         super(SkateFormerBlockDS, self).__init__()
 
         if downscale:
@@ -281,16 +349,31 @@ class SkateFormerBlockDS(nn.Module):
         return output
 
 
-''' SkateFormer Stage '''
+""" SkateFormer Stage """
 
 
 class SkateFormerStage(nn.Module):
     def __init__(
-            self, depth, in_channels, out_channels, first_depth=False,
-            num_points=50, kernel_size=7, num_heads=32,
-            type_1_size=(1, 1), type_2_size=(1, 1), type_3_size=(1, 1), type_4_size=(1, 1),
-            attn_drop=0., drop=0., rel=True, drop_path=0., mlp_ratio=4.,
-            act_layer=nn.GELU, norm_layer_transformer=nn.LayerNorm):
+        self,
+        depth,
+        in_channels,
+        out_channels,
+        first_depth=False,
+        num_points=50,
+        kernel_size=7,
+        num_heads=32,
+        type_1_size=(1, 1),
+        type_2_size=(1, 1),
+        type_3_size=(1, 1),
+        type_4_size=(1, 1),
+        attn_drop=0.0,
+        drop=0.0,
+        rel=True,
+        drop_path=0.0,
+        mlp_ratio=4.0,
+        act_layer=nn.GELU,
+        norm_layer_transformer=nn.LayerNorm,
+    ):
         super(SkateFormerStage, self).__init__()
         blocks = []
         for index in range(depth):
@@ -312,7 +395,9 @@ class SkateFormerStage(nn.Module):
                     drop_path=drop_path if isinstance(drop_path, float) else drop_path[index],
                     mlp_ratio=mlp_ratio,
                     act_layer=act_layer,
-                    norm_layer_transformer=norm_layer_transformer))
+                    norm_layer_transformer=norm_layer_transformer,
+                )
+            )
         self.blocks = nn.ModuleList(blocks)
 
     def forward(self, input):
@@ -322,15 +407,37 @@ class SkateFormerStage(nn.Module):
         return output
 
 
-''' SkateFormer '''
+""" SkateFormer """
 
 
 class SkateFormer(nn.Module):
-    def __init__(self, in_channels=3, depths=(2, 2, 2, 2), channels=(96, 192, 192, 192), num_classes=60,
-                 embed_dim=64, num_people=2, num_frames=64, num_points=50, kernel_size=7, num_heads=32,
-                 type_1_size=(1, 1), type_2_size=(1, 1), type_3_size=(1, 1), type_4_size=(1, 1),
-                 attn_drop=0., head_drop=0., drop=0., rel=True, drop_path=0., mlp_ratio=4.,
-                 act_layer=nn.GELU, norm_layer_transformer=nn.LayerNorm, index_t=False, global_pool='avg'):
+    def __init__(
+        self,
+        in_channels=3,
+        depths=(2, 2, 2, 2),
+        channels=(96, 192, 192, 192),
+        num_classes=60,
+        embed_dim=64,
+        num_people=2,
+        num_frames=64,
+        num_points=50,
+        kernel_size=7,
+        num_heads=32,
+        type_1_size=(1, 1),
+        type_2_size=(1, 1),
+        type_3_size=(1, 1),
+        type_4_size=(1, 1),
+        attn_drop=0.0,
+        head_drop=0.0,
+        drop=0.0,
+        rel=True,
+        drop_path=0.0,
+        mlp_ratio=4.0,
+        act_layer=nn.GELU,
+        norm_layer_transformer=nn.LayerNorm,
+        index_t=False,
+        global_pool="avg",
+    ):
 
         super(SkateFormer, self).__init__()
 
@@ -347,24 +454,37 @@ class SkateFormer(nn.Module):
             self.dropout = None
 
         stem = []
-        stem.append(nn.Conv2d(in_channels=in_channels, out_channels=2 * in_channels, kernel_size=(1, 1), stride=(1, 1),
-                              padding=(0, 0)))
+        stem.append(
+            nn.Conv2d(
+                in_channels=in_channels, out_channels=2 * in_channels, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)
+            )
+        )
         stem.append(act_layer())
         stem.append(
-            nn.Conv2d(in_channels=2 * in_channels, out_channels=3 * in_channels, kernel_size=(1, 1), stride=(1, 1),
-                      padding=(0, 0)))
+            nn.Conv2d(
+                in_channels=2 * in_channels,
+                out_channels=3 * in_channels,
+                kernel_size=(1, 1),
+                stride=(1, 1),
+                padding=(0, 0),
+            )
+        )
         stem.append(act_layer())
-        stem.append(nn.Conv2d(in_channels=3 * in_channels, out_channels=embed_dim, kernel_size=(1, 1), stride=(1, 1),
-                              padding=(0, 0)))
+        stem.append(
+            nn.Conv2d(
+                in_channels=3 * in_channels, out_channels=embed_dim, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)
+            )
+        )
         self.stem = nn.ModuleList(stem)
 
         if self.index_t:
             self.joint_person_embedding = nn.Parameter(torch.zeros(embed_dim, num_points * num_people))
-            trunc_normal_(self.joint_person_embedding, std=.02)
+            trunc_normal_(self.joint_person_embedding, std=0.02)
         else:
             self.joint_person_temporal_embedding = nn.Parameter(
-                torch.zeros(1, embed_dim, num_frames, num_points * num_people))
-            trunc_normal_(self.joint_person_temporal_embedding, std=.02)
+                torch.zeros(1, embed_dim, num_frames, num_points * num_people)
+            )
+            trunc_normal_(self.joint_person_temporal_embedding, std=0.02)
 
         # Init blocks
         drop_path = torch.linspace(0.0, drop_path, sum(depths)).tolist()
@@ -386,15 +506,18 @@ class SkateFormer(nn.Module):
                     attn_drop=attn_drop,
                     drop=drop,
                     rel=rel,
-                    drop_path=drop_path[sum(depths[:index]):sum(depths[:index + 1])],
+                    drop_path=drop_path[sum(depths[:index]) : sum(depths[: index + 1])],
                     mlp_ratio=mlp_ratio,
                     act_layer=act_layer,
-                    norm_layer_transformer=norm_layer_transformer
+                    norm_layer_transformer=norm_layer_transformer,
                 )
             )
         self.stages = nn.ModuleList(stages)
         self.global_pool: str = global_pool
         self.head = nn.Linear(channels[-1], num_classes)
+
+        # Koopman pooling
+        self.K = nn.Parameter(torch.randn((num_classes, channels[-1], channels[-1])))
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -434,22 +557,35 @@ class SkateFormer(nn.Module):
         if self.index_t:
             te = torch.zeros(B, T, self.embed_dim).to(output.device)  # B, T, C
             div_term = torch.exp(
-                (torch.arange(0, self.embed_dim, 2, dtype=torch.float) * -(math.log(10000.0) / self.embed_dim))).to(
-                output.device)
+                (torch.arange(0, self.embed_dim, 2, dtype=torch.float) * -(math.log(10000.0) / self.embed_dim))
+            ).to(output.device)
             te[:, :, 0::2] = torch.sin(index_t.unsqueeze(-1).float() * div_term)
             te[:, :, 1::2] = torch.cos(index_t.unsqueeze(-1).float() * div_term)
-            output = output + torch.einsum('b t c, c v -> b c t v', te, self.joint_person_embedding)
+            output = output + torch.einsum("b t c, c v -> b c t v", te, self.joint_person_embedding)
         else:
             output = output + self.joint_person_temporal_embedding
+        # 应用主特征提取和头部
         output = self.forward_features(output)
-        output = self.forward_head(output)
+
+        # 引入 Koopman Pooling 进行动态特征抽取
+        output = output.view(B, C * T, 8, M, V)
+        output = output.permute(0, 3, 1, 2, 4)  # [B, M, C, T, V]
+        output = output.mean(-1).mean(1)
+        x1 = output[:, :, :-1]  # x1 为移除最后一个时间步
+        x2 = output[:, :, 1:]  # x2 为移除第一个时间步
+
+        koopman_out = (torch.einsum("cij, bjt -> bcit", self.K, x1) - x2.unsqueeze(1)).norm(dim=-2).mean(dim=-1)
+        koopman_out = -koopman_out  # 负号处理
+        output = koopman_out
+
+        if self.dropout is not None:
+            output = self.dropout(output)
         return output
+
+        # 进一步传入网络头部
+        # output = self.forward_head(output)
+        # return output
 
 
 def SkateFormer_(**kwargs):
-    return SkateFormer(
-        depths=(2, 2, 2, 2),
-        channels=(96, 192, 192, 192),
-        embed_dim=96,
-        **kwargs
-    )
+    return SkateFormer(depths=(2, 2, 2, 2), channels=(96, 192, 192, 192), embed_dim=96, **kwargs)
