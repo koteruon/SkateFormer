@@ -38,4 +38,6 @@ data/nturgbd_raw
 data/NW-UCLA
 data/ntu/denoised_data
 data/ntu/raw_data
-
+data/table_tennis/bhpull_*
+data/table_tennis/fhpull_*
+data/table_tennis/bhc_*
