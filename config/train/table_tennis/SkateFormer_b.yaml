@@ -1,6 +1,6 @@
 seed: 1
 num_worker: 4
-work_dir: ./work_dir/table_tennis/cs/SkateFormer_j_20241005_01/
+work_dir: ./work_dir/table_tennis/cs/SkateFormer_b_20241005_01/
 
 phase: train
 
@@ -9,7 +9,7 @@ feeder: feeders.feeder_table_tennis.Feeder
 train_feeder_args:
   data_path: ./data/table_tennis/table_tennis.npz
   split: train
-  data_type: j
+  data_type: b
   debug: False
   window_size: 32 # 64 32 16 8
   p_interval: [0.5, 1]
@@ -23,7 +23,7 @@ train_feeder_args:
 test_feeder_args:
   data_path: ./data/table_tennis/table_tennis.npz
   split: test
-  data_type: j
+  data_type: b
   window_size: 32 # 64
   p_interval: [0.95]
   thres: 32 # 64

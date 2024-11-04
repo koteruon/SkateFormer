@@ -1,6 +1,6 @@
 seed: 1
 num_worker: 4
-work_dir: ./work_dir/ntu/cs/SkateFormer_j/
+work_dir: ./work_dir/ntu/cs/SkateFormer_j_koopman_pooling_20241103/
 
 phase: train
 
@@ -46,7 +46,8 @@ model_args:
   type_3_size: [8, 8]
   type_4_size: [8, 12]
   mlp_ratio: 4.0
-  index_t: True
+  index_t: None
+  koopman_pooling: True
 
 #optim
 optimizer: AdamW
@@ -60,8 +61,8 @@ warm_up_epoch: 25
 
 # training
 device: [0]
-batch_size: 64
-test_batch_size: 64
+batch_size: 32
+test_batch_size: 32
 num_epoch: 500
 nesterov: True
 grad_clip: True

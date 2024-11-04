@@ -437,6 +437,7 @@ class SkateFormer(nn.Module):
         norm_layer_transformer=nn.LayerNorm,
         index_t=False,
         global_pool="avg",
+        koopman_pooling=False,
     ):
 
         super(SkateFormer, self).__init__()
@@ -477,7 +478,9 @@ class SkateFormer(nn.Module):
         )
         self.stem = nn.ModuleList(stem)
 
-        if self.index_t:
+        if self.index_t == "None":
+            pass
+        elif self.index_t:
             self.joint_person_embedding = nn.Parameter(torch.zeros(embed_dim, num_points * num_people))
             trunc_normal_(self.joint_person_embedding, std=0.02)
         else:
@@ -516,6 +519,13 @@ class SkateFormer(nn.Module):
         self.global_pool: str = global_pool
         self.head = nn.Linear(channels[-1], num_classes)
 
+        # Koopman pooling
+        self.koopman_pooling = koopman_pooling
+        if self.koopman_pooling:
+            self.K = nn.Parameter(torch.randn((num_classes, channels[-1], channels[-1])))
+            self.depths = depths
+            self.channels = channels
+
     @torch.jit.ignore
     def no_weight_decay(self):
         nwd = set()
@@ -551,7 +561,9 @@ class SkateFormer(nn.Module):
         output = input.permute(0, 1, 2, 4, 3).contiguous().view(B, C, T, -1)  # [B, C, T, M * V]
         for layer in self.stem:
             output = layer(output)
-        if self.index_t:
+        if self.index_t == "None":
+            pass
+        elif self.index_t:
             te = torch.zeros(B, T, self.embed_dim).to(output.device)  # B, T, C
             div_term = torch.exp(
                 (torch.arange(0, self.embed_dim, 2, dtype=torch.float) * -(math.log(10000.0) / self.embed_dim))
@@ -561,9 +573,27 @@ class SkateFormer(nn.Module):
             output = output + torch.einsum("b t c, c v -> b c t v", te, self.joint_person_embedding)
         else:
             output = output + self.joint_person_temporal_embedding
+        # 应用主特征提取和头部
         output = self.forward_features(output)
-        output = self.forward_head(output)
-        return output
+
+        if self.koopman_pooling:
+            # 引入 Koopman Pooling 进行动态特征抽取
+            output = output.view(B, self.channels[-1], T // (2 ** (len(self.depths) - 1)), M, V)
+            output = output.permute(0, 3, 1, 2, 4)  # [B, M, C, T, V]
+            output = output.mean(-1).mean(1)
+            x1 = output[:, :, :-1]  # x1 为移除最后一个时间步
+            x2 = output[:, :, 1:]  # x2 为移除第一个时间步
+
+            koopman_out = (torch.einsum("cij, bjt -> bcit", self.K, x1) - x2.unsqueeze(1)).norm(dim=-2).mean(dim=-1)
+            koopman_out = -koopman_out  # 负号处理
+            output = koopman_out
+
+            if self.dropout is not None:
+                output = self.dropout(output)
+            return output
+        else:
+            output = self.forward_head(output)
+            return output
 
 
 def SkateFormer_(**kwargs):
