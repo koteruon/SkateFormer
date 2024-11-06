@@ -1,3 +1,4 @@
+import ast
 import math
 from typing import List, Optional, Set, Tuple, Type, Union
 
@@ -597,4 +598,9 @@ class SkateFormer(nn.Module):
 
 
 def SkateFormer_(**kwargs):
-    return SkateFormer(depths=(2, 2, 2, 2), channels=(96, 192, 192, 192), embed_dim=96, **kwargs)
+    if "channels" in kwargs:
+        channels = ast.literal_eval(kwargs["channels"])
+        del kwargs["channels"]
+    else:
+        channels = (96, 192, 192, 192)
+    return SkateFormer(depths=(2, 2, 2, 2), channels=channels, embed_dim=96, **kwargs)
