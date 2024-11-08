@@ -1,6 +1,6 @@
 seed: 1
 num_worker: 4
-work_dir: ./work_dir/ntu/cs/SkateFormer_j_koopman_pooling_20241106_test/
+work_dir: ./work_dir/ntu/cs/SkateFormer_j_koopman_pooling_20241108_test/
 
 phase: train
 
