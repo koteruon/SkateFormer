@@ -4,15 +4,8 @@ from typing import List, Optional, Set, Tuple, Type, Union
 import numpy as np
 import torch
 import torch.nn as nn
-from timm.models.layers import (
-    DropPath,
-    Mlp,
-    create_act_layer,
-    create_conv2d,
-    drop_path,
-    get_norm_act_layer,
-    trunc_normal_,
-)
+from timm.models.layers import (DropPath, Mlp, create_act_layer, create_conv2d,
+                                drop_path, get_norm_act_layer, trunc_normal_)
 
 """ Partition and Reverse """
 
@@ -184,6 +177,8 @@ class SkateFormerBlock(nn.Module):
         mlp_ratio=4.0,
         act_layer=nn.GELU,
         norm_layer=nn.LayerNorm,
+        conv_ratio=1,
+        attn_ratio=3,
     ):
         super(SkateFormerBlock, self).__init__()
         self.type_1_size = type_1_size
@@ -230,6 +225,10 @@ class SkateFormerBlock(nn.Module):
             in_features=in_channels, hidden_features=int(mlp_ratio * in_channels), act_layer=act_layer, drop=drop
         )
 
+        self.conv_ratio = conv_ratio
+        self.attn_ratio = attn_ratio
+        self.conv_and_attn_ratio_split = (self.conv_ratio + self.attn_ratio) // 2
+
     def forward(self, input):
         B, C, T, V = input.shape
 
@@ -239,7 +238,7 @@ class SkateFormerBlock(nn.Module):
 
         f = self.mapping(self.norm_1(input)).permute(0, 3, 1, 2).contiguous()
 
-        f_conv, f_attn = torch.split(f, [C // 2, 3 * C // 2], dim=1)
+        f_conv, f_attn = torch.split(f, [self.conv_ratio * C // self.conv_and_attn_ratio_split, self.attn_ratio * C // self.conv_and_attn_ratio_split], dim=1)
         y = []
 
         # G-Conv
@@ -315,6 +314,8 @@ class SkateFormerBlockDS(nn.Module):
         mlp_ratio=4.0,
         act_layer=nn.GELU,
         norm_layer_transformer=nn.LayerNorm,
+        conv_ratio=1,
+        attn_ratio=3,
     ):
         super(SkateFormerBlockDS, self).__init__()
 
@@ -339,6 +340,8 @@ class SkateFormerBlockDS(nn.Module):
             mlp_ratio=mlp_ratio,
             act_layer=act_layer,
             norm_layer=norm_layer_transformer,
+            conv_ratio=conv_ratio,
+            attn_ratio=attn_ratio,
         )
 
     def forward(self, input):
@@ -373,6 +376,8 @@ class SkateFormerStage(nn.Module):
         mlp_ratio=4.0,
         act_layer=nn.GELU,
         norm_layer_transformer=nn.LayerNorm,
+        conv_ratio=1,
+        attn_ratio=3,
     ):
         super(SkateFormerStage, self).__init__()
         blocks = []
@@ -396,6 +401,8 @@ class SkateFormerStage(nn.Module):
                     mlp_ratio=mlp_ratio,
                     act_layer=act_layer,
                     norm_layer_transformer=norm_layer_transformer,
+                    conv_ratio=conv_ratio,
+                    attn_ratio=attn_ratio,
                 )
             )
         self.blocks = nn.ModuleList(blocks)
@@ -438,6 +445,8 @@ class SkateFormer(nn.Module):
         index_t=False,
         global_pool="avg",
         koopman_pooling=False,
+        conv_ratio=1,
+        attn_ratio=3,
     ):
 
         super(SkateFormer, self).__init__()
@@ -513,6 +522,8 @@ class SkateFormer(nn.Module):
                     mlp_ratio=mlp_ratio,
                     act_layer=act_layer,
                     norm_layer_transformer=norm_layer_transformer,
+                    conv_ratio=conv_ratio,
+                    attn_ratio=attn_ratio,
                 )
             )
         self.stages = nn.ModuleList(stages)
