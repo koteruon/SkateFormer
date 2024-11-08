@@ -1,6 +1,6 @@
 seed: 1
 num_worker: 4
-work_dir: ./work_dir/ntu/cs/SkateFormer_j_koopman_pooling_20241103/
+work_dir: ./work_dir/ntu/cs/SkateFormer_j_koopman_pooling_20241103_test/
 
 phase: train
 
@@ -46,8 +46,9 @@ model_args:
   type_3_size: [8, 8]
   type_4_size: [8, 12]
   mlp_ratio: 4.0
-  index_t: None
+  index_t: True
   koopman_pooling: True
+  channels: (96, 288, 288, 288)
 
 #optim
 optimizer: AdamW
