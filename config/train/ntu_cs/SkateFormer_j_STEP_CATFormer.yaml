@@ -1,15 +1,14 @@
 seed: 1
 num_worker: 4
-work_dir: ./work_dir/ntu/cs/SkateFormer_b/
+work_dir: ./work_dir/ntu/cs/SkateFormer_j_STEP_CATFormer_20241203_test/
 
 phase: train
 
 # feeder
-feeder: feeders.feeder_ntu.Feeder
+feeder: feeders.feeder_ntu_add_21.Feeder
 train_feeder_args:
   data_path: ./data/ntu/NTU60_CS.npz
   split: train
-  data_type: b
   debug: False
   window_size: 64
   p_interval: [0.5, 1]
@@ -23,7 +22,6 @@ train_feeder_args:
 test_feeder_args:
   data_path: ./data/ntu/NTU60_CS.npz
   split: test
-  data_type: b
   window_size: 64
   p_interval: [0.95]
   thres: 64

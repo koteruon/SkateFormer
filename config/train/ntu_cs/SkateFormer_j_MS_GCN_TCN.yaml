@@ -1,6 +1,6 @@
 seed: 1
 num_worker: 4
-work_dir: ./work_dir/ntu/cs/SkateFormer_b/
+work_dir: ./work_dir/ntu/cs/SkateFormer_j_MS_GCN_TCN_20241204_test/
 
 phase: train
 
@@ -9,7 +9,6 @@ feeder: feeders.feeder_ntu.Feeder
 train_feeder_args:
   data_path: ./data/ntu/NTU60_CS.npz
   split: train
-  data_type: b
   debug: False
   window_size: 64
   p_interval: [0.5, 1]
@@ -23,7 +22,6 @@ train_feeder_args:
 test_feeder_args:
   data_path: ./data/ntu/NTU60_CS.npz
   split: test
-  data_type: b
   window_size: 64
   p_interval: [0.95]
   thres: 64
@@ -32,7 +30,7 @@ test_feeder_args:
   debug: False
 
 # model
-model: model.SkateFormer.SkateFormer_
+model: model.SkateFormer_MS_GCN_TCN.SkateFormer_
 model_args:
   num_classes: 60
   num_people: 2
@@ -49,22 +47,25 @@ model_args:
   type_4_size: [8, 12]
   mlp_ratio: 4.0
   index_t: True
+  num_gcn_scales: 13
+  graph: graph.ntu_rgb_d_patition.AdjMatrixGraph
+
 
 #optim
 optimizer: AdamW
-weight_decay: 0.1
+weight_decay: 0.2 # 0.1
 lr_scheduler: cosine
-base_lr: 1e-3
+base_lr: 1e-4
 min_lr: 1e-5
-warmup_lr: 1e-7
+warmup_lr: 1e-6
 warmup_prefix: False
-warm_up_epoch: 25
+warm_up_epoch: 50 #25
 
 # training
 device: [0,1]
 batch_size: 128
 test_batch_size: 128
-num_epoch: 500
+num_epoch: 750 #500
 nesterov: True
 grad_clip: True
 grad_max: 1.0
