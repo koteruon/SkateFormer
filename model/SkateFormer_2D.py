@@ -413,7 +413,7 @@ class SkateFormerStage(nn.Module):
 class SkateFormer(nn.Module):
     def __init__(
         self,
-        in_channels=3,
+        in_channels=2,
         depths=(2, 2, 2, 2),
         channels=(96, 192, 192, 192),
         num_classes=60,

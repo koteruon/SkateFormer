@@ -1,27 +1,27 @@
 seed: 1
 num_worker: 4
-work_dir: ./work_dir/table_tennis/cs/SkateFormer_b_20241005_01/
+work_dir: ./work_dir/table_tennis/cs/SkateFormer_b_2D_20250305_01/
 
 phase: train
 
 # feeder
-feeder: feeders.feeder_table_tennis.Feeder
+feeder: feeders.feeder_table_tennis_2D.Feeder
 train_feeder_args:
-  data_path: ./data/table_tennis/table_tennis.npz
+  data_path: ./data/table_tennis_2D/table_tennis.npz
   split: train
   data_type: b
   debug: False
   window_size: 32 # 64 32 16 8
   p_interval: [0.5, 1]
-  aug_method: '123489'
-  intra_p: 0.5 # 0.5
-  inter_p: 0.2 # 0.2
+  aug_method: '' # '123489'
+  intra_p: 0.0 # 0.5 Intra-instance Augmentation
+  inter_p: 0.0 # 0.2 Inter-instance Augmentation
   thres: 32 # 64
   uniform: True
   partition: True
 
 test_feeder_args:
-  data_path: ./data/table_tennis/table_tennis.npz
+  data_path: ./data/table_tennis_2D/table_tennis.npz
   split: test
   data_type: b
   window_size: 32 # 64
@@ -32,7 +32,7 @@ test_feeder_args:
   debug: False
 
 # model
-model: model.SkateFormer.SkateFormer_
+model: model.SkateFormer_2D.SkateFormer_
 model_args:
   num_classes: 8 # 60
   num_people: 1 # 2
