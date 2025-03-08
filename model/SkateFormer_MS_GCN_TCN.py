@@ -14,6 +14,10 @@ from timm.models.layers import (
     trunc_normal_,
 )
 
+from model.ms_gcn import MultiScale_GraphConv as MS_GCN
+from model.ms_tcn import MultiScale_TemporalConv as MS_TCN
+from utils import import_class
+
 """ Partition and Reverse """
 
 
@@ -184,6 +188,9 @@ class SkateFormerBlock(nn.Module):
         mlp_ratio=4.0,
         act_layer=nn.GELU,
         norm_layer=nn.LayerNorm,
+        num_people=2,
+        num_gcn_scales=13,
+        graph=None,
     ):
         super(SkateFormerBlock, self).__init__()
         self.type_1_size = type_1_size
@@ -197,14 +204,22 @@ class SkateFormerBlock(nn.Module):
 
         self.norm_1 = norm_layer(in_channels)
         self.mapping = nn.Linear(in_features=in_channels, out_features=2 * in_channels, bias=True)
-        self.gconv = nn.Parameter(torch.zeros(num_heads // (2 * 2), num_points, num_points))
-        trunc_normal_(self.gconv, std=0.02)
-        self.tconv = nn.Conv2d(
-            in_channels // (2 * 2),
-            in_channels // (2 * 2),
-            kernel_size=(kernel_size, 1),
-            padding=((kernel_size - 1) // 2, 0),
-            groups=num_heads // (2 * 2),
+        # self.gconv = nn.Parameter(torch.zeros(num_heads // (2 * 2), num_points, num_points))
+        # trunc_normal_(self.gconv, std=0.02)
+        # self.tconv = nn.Conv2d(
+        #     in_channels // (2 * 2),
+        #     in_channels // (2 * 2),
+        #     kernel_size=(kernel_size, 1),
+        #     padding=((kernel_size - 1) // 2, 0),
+        #     groups=num_heads // (2 * 2),
+        # )
+
+        self.M = num_people
+        Graph = import_class(graph)
+        A_binary = Graph().A_binary
+        C = in_channels // 2
+        self.sgcn = nn.Sequential(
+            MS_GCN(num_gcn_scales, 3, C, A_binary, disentangled_agg=True), MS_TCN(C, C), MS_TCN(C, C)
         )
 
         # Attention layers
@@ -243,16 +258,21 @@ class SkateFormerBlock(nn.Module):
         y = []
 
         # G-Conv
-        split_f_conv = torch.chunk(f_conv, 2, dim=1)
-        y_gconv = []
-        split_f_gconv = torch.chunk(split_f_conv[0], self.gconv.shape[0], dim=1)
-        for i in range(self.gconv.shape[0]):
-            z = torch.einsum("n c t u, v u -> n c t v", split_f_gconv[i], self.gconv[i])
-            y_gconv.append(z)
-        y.append(torch.cat(y_gconv, dim=1))  # N C T V
+        # split_f_conv = torch.chunk(f_conv, 2, dim=1)
+        # y_gconv = []
+        # split_f_gconv = torch.chunk(split_f_conv[0], self.gconv.shape[0], dim=1)
+        # for i in range(self.gconv.shape[0]):
+        #     z = torch.einsum("n c t u, v u -> n c t v", split_f_gconv[i], self.gconv[i])
+        #     y_gconv.append(z)
+        # y.append(torch.cat(y_gconv, dim=1))  # N C T V
 
         # T-Conv
-        y.append(self.tconv(split_f_conv[1]))
+        # y.append(self.tconv(split_f_conv[1]))
+        M = self.M
+        f_conv = f_conv.view(B, C // 2, T, M, V // M).permute(0, 3, 1, 2, 4).reshape(B * M, C // 2, T, V // M)
+        f_conv_output = self.sgcn(f_conv)
+        f_conv_output = f_conv_output.view(B, M, C // 2, T, V // M).permute(0, 2, 3, 1, 4).reshape(B, C // 2, T, V)
+        y.append(f_conv_output)
 
         # Skate-MSA
         split_f_attn = torch.chunk(f_attn, len(self.partition_function), dim=1)
@@ -315,6 +335,9 @@ class SkateFormerBlockDS(nn.Module):
         mlp_ratio=4.0,
         act_layer=nn.GELU,
         norm_layer_transformer=nn.LayerNorm,
+        num_people=2,
+        num_gcn_scales=13,
+        graph=None,
     ):
         super(SkateFormerBlockDS, self).__init__()
 
@@ -339,6 +362,9 @@ class SkateFormerBlockDS(nn.Module):
             mlp_ratio=mlp_ratio,
             act_layer=act_layer,
             norm_layer=norm_layer_transformer,
+            num_people=num_people,
+            num_gcn_scales=num_gcn_scales,
+            graph=graph,
         )
 
     def forward(self, input):
@@ -373,6 +399,9 @@ class SkateFormerStage(nn.Module):
         mlp_ratio=4.0,
         act_layer=nn.GELU,
         norm_layer_transformer=nn.LayerNorm,
+        num_people=2,
+        num_gcn_scales=13,
+        graph=None,
     ):
         super(SkateFormerStage, self).__init__()
         blocks = []
@@ -396,6 +425,9 @@ class SkateFormerStage(nn.Module):
                     mlp_ratio=mlp_ratio,
                     act_layer=act_layer,
                     norm_layer_transformer=norm_layer_transformer,
+                    num_people=num_people,
+                    num_gcn_scales=num_gcn_scales,
+                    graph=graph,
                 )
             )
         self.blocks = nn.ModuleList(blocks)
@@ -437,6 +469,8 @@ class SkateFormer(nn.Module):
         norm_layer_transformer=nn.LayerNorm,
         index_t=False,
         global_pool="avg",
+        num_gcn_scales=13,
+        graph=None,
     ):
 
         super(SkateFormer, self).__init__()
@@ -510,6 +544,9 @@ class SkateFormer(nn.Module):
                     mlp_ratio=mlp_ratio,
                     act_layer=act_layer,
                     norm_layer_transformer=norm_layer_transformer,
+                    num_people=num_people,
+                    num_gcn_scales=num_gcn_scales,
+                    graph=graph,
                 )
             )
         self.stages = nn.ModuleList(stages)
