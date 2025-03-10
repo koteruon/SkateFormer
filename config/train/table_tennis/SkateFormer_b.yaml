@@ -1,6 +1,7 @@
-seed: 1
+# 1 不可以是0
+seed: 3
 num_worker: 4
-work_dir: ./work_dir/table_tennis/cs/SkateFormer_b_2D_20250305_01/
+work_dir: ./work_dir/table_tennis/cs/SkateFormer_b_2D_20250310_03/
 
 phase: train
 
