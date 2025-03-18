@@ -14,6 +14,8 @@ from timm.models.layers import (
     trunc_normal_,
 )
 
+from model.ms_tcn import MultiScale_TemporalConv as MS_TCN
+
 """ Partition and Reverse """
 
 
@@ -199,13 +201,14 @@ class SkateFormerBlock(nn.Module):
         self.mapping = nn.Linear(in_features=in_channels, out_features=2 * in_channels, bias=True)
         self.gconv = nn.Parameter(torch.zeros(num_heads // (2 * 2), num_points, num_points))
         trunc_normal_(self.gconv, std=0.02)
-        self.tconv = nn.Conv2d(
-            in_channels // (2 * 2),
-            in_channels // (2 * 2),
-            kernel_size=(kernel_size, 1),
-            padding=((kernel_size - 1) // 2, 0),
-            groups=num_heads // (2 * 2),
-        )
+        # self.tconv = nn.Conv2d(
+        #     in_channels // (2 * 2),
+        #     in_channels // (2 * 2),
+        #     kernel_size=(kernel_size, 1),
+        #     padding=((kernel_size - 1) // 2, 0),
+        #     groups=num_heads // (2 * 2),
+        # )
+        self.mstcn = MS_TCN(in_channels // (2 * 2), in_channels // (2 * 2))
 
         # Attention layers
         attention = []
@@ -252,7 +255,8 @@ class SkateFormerBlock(nn.Module):
         y.append(torch.cat(y_gconv, dim=1))  # N C T V
 
         # T-Conv
-        y.append(self.tconv(split_f_conv[1]))
+        # y.append(self.tconv(split_f_conv[1]))
+        y.append(self.mstcn(split_f_conv[1]))
 
         # Skate-MSA
         split_f_attn = torch.chunk(f_attn, len(self.partition_function), dim=1)

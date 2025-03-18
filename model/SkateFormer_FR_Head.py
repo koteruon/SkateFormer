@@ -14,6 +14,8 @@ from timm.models.layers import (
     trunc_normal_,
 )
 
+from .lib import ST_RenovateNet
+
 """ Partition and Reverse """
 
 
@@ -516,6 +518,10 @@ class SkateFormer(nn.Module):
         self.global_pool: str = global_pool
         self.head = nn.Linear(channels[-1], num_classes)
 
+        self.channels = channels
+
+        self.build_cl_blocks(num_frames, num_points, num_people, num_classes)
+
     @torch.jit.ignore
     def no_weight_decay(self):
         nwd = set()
@@ -532,9 +538,11 @@ class SkateFormer(nn.Module):
 
     def forward_features(self, input):
         output = input
+        feat = []
         for stage in self.stages:
             output = stage(output)
-        return output
+            feat.append(output.clone())
+        return output, feat
 
     def forward_head(self, input, pre_logits=False):
         if self.global_pool == "avg":
@@ -545,7 +553,7 @@ class SkateFormer(nn.Module):
             input = self.dropout(input)
         return input if pre_logits else self.head(input)
 
-    def forward(self, input, index_t):
+    def forward(self, input, index_t, label):
         B, C, T, V, M = input.shape
 
         output = input.permute(0, 1, 2, 4, 3).contiguous().view(B, C, T, -1)  # [B, C, T, M * V]
@@ -561,9 +569,83 @@ class SkateFormer(nn.Module):
             output = output + torch.einsum("b t c, c v -> b c t v", te, self.joint_person_embedding)
         else:
             output = output + self.joint_person_temporal_embedding
-        output = self.forward_features(output)
-        output = self.forward_head(output)
-        return output
+        output, feat = self.forward_features(output)
+        feat_low, feat_mid, feat_high, feat_fin = feat
+
+        feat_low = feat_low.view(B, self.channels[0], T, M, V)
+        feat_low = feat_low.permute(0, 3, 1, 2, 4).contiguous()  # [B, M, C, T, V]
+        feat_low = feat_low.view(B * M, self.channels[0], T, V)  # [B * M, C, T, V]
+
+        feat_mid = feat_mid.view(B, self.channels[1], T // 2, M, V)
+        feat_mid = feat_mid.permute(0, 3, 1, 2, 4).contiguous()  # [B, M, C, T, V]
+        feat_mid = feat_mid.view(B * M, self.channels[1], T // 2, V)  # [B * M, C, T, V]
+
+        feat_high = feat_high.view(B, self.channels[2], T // 4, M, V)
+        feat_high = feat_high.permute(0, 3, 1, 2, 4).contiguous()  # [B, M, C, T, V]
+        feat_high = feat_high.view(B * M, self.channels[2], T // 4, V)  # [B * M, C, T, V]
+
+        feat_fin = feat_fin.view(B, self.channels[3], T // 8, M, V)
+        feat_fin = feat_fin.permute(0, 3, 1, 2, 4).contiguous()  # [B, M, C, T, V]
+        feat_fin = feat_fin.view(B * M, self.channels[3], T // 8, V)  # [B * M, C, T, V]
+
+        output = output.view(B, self.channels[-1], T // 8, M, V)
+        output = output.permute(0, 3, 1, 2, 4).contiguous()  # [B, M, C, T, V]
+        output = output.view(B, M, self.channels[-1], -1)  # [B, M, C, T * V]
+        output = output.mean(3).mean(1)
+        # output = self.forward_head(output)
+        return self.get_ST_Multi_Level_cl_output(output, feat_low, feat_mid, feat_high, feat_fin, label)
+
+    # FR-Head
+
+    def build_cl_blocks(self, num_frames, num_points, num_people, num_classes):
+        self.cl_version = "V0"
+        self.multi_cl_weights = [1, 1, 1, 1]
+        self.ren_low = ST_RenovateNet(
+            96,
+            num_frames,
+            num_points,
+            num_people,
+            n_class=num_classes,
+            version=self.cl_version,
+        )
+        self.ren_mid = ST_RenovateNet(
+            192,
+            num_frames // 2,
+            num_points,
+            num_people,
+            n_class=num_classes,
+            version=self.cl_version,
+        )
+        self.ren_high = ST_RenovateNet(
+            192,
+            num_frames // 4,
+            num_points,
+            num_people,
+            n_class=num_classes,
+            version=self.cl_version,
+        )
+        self.ren_fin = ST_RenovateNet(
+            192,
+            num_frames // 8,
+            num_points,
+            num_people,
+            n_class=num_classes,
+            version=self.cl_version,
+        )
+
+    def get_ST_Multi_Level_cl_output(self, x, feat_low, feat_mid, feat_high, feat_fin, label):
+        logits = self.head(x)
+        cl_low = self.ren_low(feat_low, label.detach(), logits.detach())
+        cl_mid = self.ren_mid(feat_mid, label.detach(), logits.detach())
+        cl_high = self.ren_high(feat_high, label.detach(), logits.detach())
+        cl_fin = self.ren_fin(feat_fin, label.detach(), logits.detach())
+        cl_loss = (
+            cl_low * self.multi_cl_weights[0]
+            + cl_mid * self.multi_cl_weights[1]
+            + cl_high * self.multi_cl_weights[2]
+            + cl_fin * self.multi_cl_weights[3]
+        )
+        return logits, cl_loss.unsqueeze(0)
 
 
 def SkateFormer_(**kwargs):

@@ -1,18 +1,12 @@
+import ast
 import math
 from typing import List, Optional, Set, Tuple, Type, Union
 
 import numpy as np
 import torch
 import torch.nn as nn
-from timm.models.layers import (
-    DropPath,
-    Mlp,
-    create_act_layer,
-    create_conv2d,
-    drop_path,
-    get_norm_act_layer,
-    trunc_normal_,
-)
+from timm.models.layers import (DropPath, Mlp, create_act_layer, create_conv2d,
+                                drop_path, get_norm_act_layer, trunc_normal_)
 
 """ Partition and Reverse """
 
@@ -184,6 +178,8 @@ class SkateFormerBlock(nn.Module):
         mlp_ratio=4.0,
         act_layer=nn.GELU,
         norm_layer=nn.LayerNorm,
+        conv_ratio=1,
+        attn_ratio=3,
     ):
         super(SkateFormerBlock, self).__init__()
         self.type_1_size = type_1_size
@@ -230,6 +226,10 @@ class SkateFormerBlock(nn.Module):
             in_features=in_channels, hidden_features=int(mlp_ratio * in_channels), act_layer=act_layer, drop=drop
         )
 
+        self.conv_ratio = conv_ratio
+        self.attn_ratio = attn_ratio
+        self.conv_and_attn_ratio_split = (self.conv_ratio + self.attn_ratio) // 2
+
     def forward(self, input):
         B, C, T, V = input.shape
 
@@ -239,7 +239,7 @@ class SkateFormerBlock(nn.Module):
 
         f = self.mapping(self.norm_1(input)).permute(0, 3, 1, 2).contiguous()
 
-        f_conv, f_attn = torch.split(f, [C // 2, 3 * C // 2], dim=1)
+        f_conv, f_attn = torch.split(f, [self.conv_ratio * C // self.conv_and_attn_ratio_split, self.attn_ratio * C // self.conv_and_attn_ratio_split], dim=1)
         y = []
 
         # G-Conv
@@ -315,6 +315,8 @@ class SkateFormerBlockDS(nn.Module):
         mlp_ratio=4.0,
         act_layer=nn.GELU,
         norm_layer_transformer=nn.LayerNorm,
+        conv_ratio=1,
+        attn_ratio=3,
     ):
         super(SkateFormerBlockDS, self).__init__()
 
@@ -339,6 +341,8 @@ class SkateFormerBlockDS(nn.Module):
             mlp_ratio=mlp_ratio,
             act_layer=act_layer,
             norm_layer=norm_layer_transformer,
+            conv_ratio=conv_ratio,
+            attn_ratio=attn_ratio,
         )
 
     def forward(self, input):
@@ -373,6 +377,8 @@ class SkateFormerStage(nn.Module):
         mlp_ratio=4.0,
         act_layer=nn.GELU,
         norm_layer_transformer=nn.LayerNorm,
+        conv_ratio=1,
+        attn_ratio=3,
     ):
         super(SkateFormerStage, self).__init__()
         blocks = []
@@ -396,6 +402,8 @@ class SkateFormerStage(nn.Module):
                     mlp_ratio=mlp_ratio,
                     act_layer=act_layer,
                     norm_layer_transformer=norm_layer_transformer,
+                    conv_ratio=conv_ratio,
+                    attn_ratio=attn_ratio,
                 )
             )
         self.blocks = nn.ModuleList(blocks)
@@ -437,6 +445,9 @@ class SkateFormer(nn.Module):
         norm_layer_transformer=nn.LayerNorm,
         index_t=False,
         global_pool="avg",
+        koopman_pooling=False,
+        conv_ratio=1,
+        attn_ratio=3,
     ):
 
         super(SkateFormer, self).__init__()
@@ -477,7 +488,9 @@ class SkateFormer(nn.Module):
         )
         self.stem = nn.ModuleList(stem)
 
-        if self.index_t:
+        if self.index_t == "None":
+            pass
+        elif self.index_t:
             self.joint_person_embedding = nn.Parameter(torch.zeros(embed_dim, num_points * num_people))
             trunc_normal_(self.joint_person_embedding, std=0.02)
         else:
@@ -510,11 +523,20 @@ class SkateFormer(nn.Module):
                     mlp_ratio=mlp_ratio,
                     act_layer=act_layer,
                     norm_layer_transformer=norm_layer_transformer,
+                    conv_ratio=conv_ratio,
+                    attn_ratio=attn_ratio,
                 )
             )
         self.stages = nn.ModuleList(stages)
         self.global_pool: str = global_pool
         self.head = nn.Linear(channels[-1], num_classes)
+
+        # Koopman pooling
+        self.koopman_pooling = koopman_pooling
+        if self.koopman_pooling:
+            self.K = nn.Parameter(torch.randn((num_classes, channels[-1], channels[-1])))
+            self.depths = depths
+            self.channels = channels
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -551,7 +573,9 @@ class SkateFormer(nn.Module):
         output = input.permute(0, 1, 2, 4, 3).contiguous().view(B, C, T, -1)  # [B, C, T, M * V]
         for layer in self.stem:
             output = layer(output)
-        if self.index_t:
+        if self.index_t == "None":
+            pass
+        elif self.index_t:
             te = torch.zeros(B, T, self.embed_dim).to(output.device)  # B, T, C
             div_term = torch.exp(
                 (torch.arange(0, self.embed_dim, 2, dtype=torch.float) * -(math.log(10000.0) / self.embed_dim))
@@ -561,10 +585,33 @@ class SkateFormer(nn.Module):
             output = output + torch.einsum("b t c, c v -> b c t v", te, self.joint_person_embedding)
         else:
             output = output + self.joint_person_temporal_embedding
+        # 应用主特征提取和头部
         output = self.forward_features(output)
-        output = self.forward_head(output)
-        return output
+
+        if self.koopman_pooling:
+            # 引入 Koopman Pooling 进行动态特征抽取
+            output = output.view(B, self.channels[-1], T // (2 ** (len(self.depths) - 1)), M, V)
+            output = output.permute(0, 3, 1, 2, 4)  # [B, M, C, T, V]
+            output = output.mean(-1).mean(1)
+            x1 = output[:, :, :-1]  # x1 为移除最后一个时间步
+            x2 = output[:, :, 1:]  # x2 为移除第一个时间步
+
+            koopman_out = (torch.einsum("cij, bjt -> bcit", self.K, x1) - x2.unsqueeze(1)).norm(dim=-2).mean(dim=-1)
+            koopman_out = -koopman_out  # 负号处理
+            output = koopman_out
+
+            if self.dropout is not None:
+                output = self.dropout(output)
+            return output
+        else:
+            output = self.forward_head(output)
+            return output
 
 
 def SkateFormer_(**kwargs):
-    return SkateFormer(depths=(2, 2, 2, 2), channels=(96, 192, 192, 192), embed_dim=96, **kwargs)
+    if "channels" in kwargs:
+        channels = ast.literal_eval(kwargs["channels"])
+        del kwargs["channels"]
+    else:
+        channels = (96, 192, 192, 192)
+    return SkateFormer(depths=(2, 2, 2, 2), channels=channels, embed_dim=96, **kwargs)
