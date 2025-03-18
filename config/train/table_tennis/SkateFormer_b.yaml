@@ -1,7 +1,7 @@
 # 1 不可以是0
-seed: 1
+seed: 2
 num_worker: 4
-work_dir: ./work_dir/table_tennis/cs/SkateFormer_b_2D_20250311/
+work_dir: ./work_dir/table_tennis/cs/SkateFormer_b_2D_20250312_02/
 
 phase: train
 
@@ -33,7 +33,7 @@ test_feeder_args:
   debug: False
 
 # model
-model: model.SkateFormer_2D.SkateFormer_
+model: model.SkateFormer_2D_for_hit.SkateFormer_
 model_args:
   num_classes: 8 # 60
   num_people: 1 # 2

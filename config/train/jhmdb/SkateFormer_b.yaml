@@ -1,7 +1,7 @@
 # 1 不可以是0
-seed: 1
+seed: 2
 num_worker: 4
-work_dir: ./work_dir/jhmdb/SkateFormer_b_2D_20250311_01/
+work_dir: ./work_dir/jhmdb/SkateFormer_b_2D_20250318_01/
 
 phase: train
 
@@ -12,12 +12,12 @@ train_feeder_args:
   split: train
   data_type: b
   debug: False
-  window_size: 48 # 64 32 16 8
-  p_interval: [0.5, 1]
-  aug_method: '' # '123489'
-  intra_p: 0.0 # 0.5 Intra-instance Augmentation
+  window_size: 32 # 64 32 16 8
+  p_interval: [0.95] # [0.5, 1]
+  aug_method: '123489' # '123489'
+  intra_p: 0.75 # 0.5 Intra-instance Augmentation
   inter_p: 0.0 # 0.2 Inter-instance Augmentation
-  thres: 48 # 64
+  thres: 32 # 64
   uniform: True
   partition: True
 
@@ -25,15 +25,15 @@ test_feeder_args:
   data_path: ./data/jhmdb_2D/jhmdb.npz
   split: test
   data_type: b
-  window_size: 48 # 64
+  window_size: 32 # 64
   p_interval: [0.95]
-  thres: 48 # 64
+  thres: 32 # 64
   uniform: True
   partition: True
   debug: False
 
 # model
-model: model.SkateFormer_2D.SkateFormer_
+model: model.SkateFormer_2D_for_hit.SkateFormer_
 model_args:
   num_classes: 21 # 60
   num_people: 1 # 2
@@ -44,10 +44,10 @@ model_args:
   head_drop: 0.0
   rel: True
   drop_path: 0.2 # 0.2
-  type_1_size: [2, 4] # [8, 8] # 需要小於window_size//4
-  type_2_size: [2, 8] # [8, 12]
-  type_3_size: [2, 4] # [8, 8]
-  type_4_size: [2, 8] # [8, 12]
+  type_1_size: [4, 4] # [8, 8] # 需要小於window_size//4
+  type_2_size: [4, 8] # [8, 12]
+  type_3_size: [4, 4] # [8, 8]
+  type_4_size: [4, 8] # [8, 12]
   mlp_ratio: 4.0 # 4.0
   index_t: True
 
@@ -63,8 +63,8 @@ warm_up_epoch: 25 # 25
 
 # training
 device: [0]
-batch_size: 1 # 128
-test_batch_size: 1 # 128
+batch_size: 128 # 128
+test_batch_size: 128 # 128
 num_epoch: 500 # 500
 nesterov: True
 grad_clip: True

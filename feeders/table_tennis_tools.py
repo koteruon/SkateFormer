@@ -110,7 +110,7 @@ def valid_crop_uniform(data_numpy, valid_frame_num, p_interval, window, thres):
     return data, index_t.numpy()
 
 
-def shear(data_numpy, s1=None, s2=None, p=0.5):
+def shear(data_numpy, s1=None, p=0.5):
     """
     method 1 隨機的剪切變換
     """
@@ -119,13 +119,9 @@ def shear(data_numpy, s1=None, s2=None, p=0.5):
         if s1 != None:
             s1_list = s1
         else:
-            s1_list = [random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5)]
-        if s2 != None:
-            s2_list = s2
-        else:
-            s2_list = [random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5)]
+            s1_list = [random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5)]
 
-        R = np.array([[1, s1_list[0], s2_list[0]], [s1_list[1], 1, s2_list[1]], [s1_list[2], s2_list[2], 1]])
+        R = np.array([[1, s1_list[0]], [s1_list[1], 1]])
         R = R.transpose()
         temp = np.dot(temp.transpose([1, 2, 3, 0]), R)
         temp = temp.transpose(3, 0, 1, 2)
@@ -141,7 +137,7 @@ def rotate(data_numpy, axis=None, angle=None, p=0.5):
     if axis != None:
         axis_next = axis
     else:
-        axis_next = random.randint(0, 2)
+        axis_next = random.randint(0, 1)  # 只有x和y軸可選
 
     if angle != None:
         angle_next = random.uniform(-angle, angle)
@@ -151,15 +147,12 @@ def rotate(data_numpy, axis=None, angle=None, p=0.5):
     if random.random() < p:
         temp = data_numpy.copy()
         angle = math.radians(angle_next)
-        # x
+        # 若旋轉軸為x，則旋轉矩陣為：
         if axis_next == 0:
-            R = np.array([[1, 0, 0], [0, math.cos(angle), math.sin(angle)], [0, -math.sin(angle), math.cos(angle)]])
-        # y
-        if axis_next == 1:
-            R = np.array([[math.cos(angle), 0, -math.sin(angle)], [0, 1, 0], [math.sin(angle), 0, math.cos(angle)]])
-        # z
-        if axis_next == 2:
-            R = np.array([[math.cos(angle), math.sin(angle), 0], [-math.sin(angle), math.cos(angle), 0], [0, 0, 1]])
+            R = np.array([[1, 0], [0, math.cos(angle)]])
+        # 若旋轉軸為y，則旋轉矩陣為：
+        elif axis_next == 1:
+            R = np.array([[math.cos(angle), 0], [0, 1]])
         R = R.transpose()
         temp = np.dot(temp.transpose([1, 2, 3, 0]), R)
         temp = temp.transpose(3, 0, 1, 2)
@@ -173,7 +166,7 @@ def scale(data_numpy, scale=0.2, p=0.5):
     method 3 隨機縮放
     """
     if random.random() < p:
-        scale = 1 + np.random.uniform(-1, 1, size=(3, 1, 1, 1)) * np.array(scale)
+        scale = 1 + np.random.uniform(-1, 1, size=(2, 1, 1, 1)) * np.array(scale)
         return data_numpy * scale
     else:
         return data_numpy.copy()
@@ -184,7 +177,7 @@ def spatial_flip(data_numpy, p=0.5):
     method 4 進行空間上的翻轉
     """
     transform_order = {
-        "table_tennis": [0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 13, 13],
+        "table_tennis": [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15],
     }
     if random.random() < p:
         index = transform_order["table_tennis"]
@@ -263,7 +256,7 @@ def drop_axis(data_numpy, axis=None, p=0.5):
     if axis != None:
         axis_next = axis
     else:
-        axis_next = random.randint(0, 2)
+        axis_next = random.randint(0, 1)
 
     if random.random() < p:
         temp = data_numpy.copy()
@@ -342,24 +335,30 @@ def skeleton_adain_bone_length(input, ref):  # C T V M
 class joint2bone(nn.Module):
     def __init__(self):
         super(joint2bone, self).__init__()
+        # 定義 16 條骨骼的關節點索引 (對應 COCO 17 個關鍵點)
         self.pairs = [
-            (0, 7),
-            (7, 7),
-            (9, 8),
-            (10, 9),
-            (11, 8),
-            (12, 11),
-            (13, 12),
-            (14, 8),
-            (15, 14),
-            (16, 15),
-            (4, 0),
-            (5, 4),
-            (6, 5),
-            (1, 0),
-            (2, 1),
-            (3, 2),
-            (8, 7),
+            # 頭部 (Head)
+            (0, 2),  # 鼻子 → 左眼 (左眉骨)
+            (0, 1),  # 鼻子 → 右眼 (右眉骨)
+            (2, 4),  # 左眼 → 左耳 (左側頭)
+            (1, 3),  # 右眼 → 右耳 (右側頭)
+            # 軀幹 (Torso)
+            (6, 5),  # 左肩 → 右肩 (上胸)
+            (12, 11),  # 左臀 → 右臀 (骨盆)
+            (6, 12),  # 左肩 → 左臀 (左軀幹)
+            (5, 11),  # 右肩 → 右臀 (右軀幹)
+            # 左手 (Left Arm)
+            (6, 8),  # 左肩 → 左肘 (左上臂)
+            (8, 10),  # 左肘 → 左手腕 (左前臂)
+            # 右手 (Right Arm)
+            (5, 7),  # 右肩 → 右肘 (右上臂)
+            (7, 9),  # 右肘 → 右手腕 (右前臂)
+            # 左腳 (Left Leg)
+            (12, 14),  # 左臀 → 左膝 (左大腿)
+            (14, 16),  # 左膝 → 左腳踝 (左小腿)
+            # 右腳 (Right Leg)
+            (11, 13),  # 右臀 → 右膝 (右大腿)
+            (13, 15),  # 右膝 → 右腳踝 (右小腿)
         ]
 
     def __call__(self, joint):
@@ -372,23 +371,44 @@ class joint2bone(nn.Module):
 class bone2joint(nn.Module):
     def __init__(self):
         super(bone2joint, self).__init__()
-        self.center = 7
-        self.pairs_1 = [(0, 7), (8, 7)]
-        self.pairs_2 = [(9, 8), (11, 8), (14, 8), (4, 0), (1, 0)]
-        self.pairs_3 = [(10, 9), (12, 11), (15, 14), (5, 4), (2, 1)]
-        self.pairs_4 = [(13, 12), (16, 15), (6, 5), (3, 2)]
+        self.center = 0  # 中心關節是0
+
+        # 五個骨骼連接對 (pairs)：
+        # 1. 頭部 (Head)
+        # 2. 軀幹 (Torso)
+        # 3. 左手 (Left Arm) 和右手 (Right Arm)
+        # 4. 左腳 (Left Leg) 和右腳 (Right Leg)
+        # 5. 綜合各部位的連接
+        self.pairs_1 = [(0, 2), (0, 1), (2, 4), (1, 3)]  # 頭部 (Head)
+        self.pairs_2 = [(6, 5), (12, 11), (6, 12), (5, 11)]  # 軀幹 (Torso)
+        self.pairs_3 = [(6, 8), (8, 10), (5, 7), (7, 9)]  # 左手 (Left Arm) 和 右手 (Right Arm)
+        self.pairs_4 = [(12, 14), (14, 16), (11, 13), (13, 15)]  # 左腳 (Left Leg) 和 右腳 (Right Leg)
+        self.pairs_5 = [(0, 7), (8, 7), (9, 8), (11, 8), (14, 8)]  # 綜合部位連接
 
     def __call__(self, bone, center):
         joint = np.zeros_like(bone)
-        joint[:, :, self.center, :] = center
+        joint[:, :, self.center, :] = center  # 設置中心點位置
+
+        # 計算頭部連接 (Head)
         for v1, v2 in self.pairs_1:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
+        # 計算軀幹連接 (Torso)
         for v1, v2 in self.pairs_2:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
+        # 計算左右手連接 (Arms)
         for v1, v2 in self.pairs_3:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
+        # 計算左右腳連接 (Legs)
         for v1, v2 in self.pairs_4:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
+        # 綜合所有部位的連接 (Body parts)
+        for v1, v2 in self.pairs_5:
+            joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
         return joint
 
 

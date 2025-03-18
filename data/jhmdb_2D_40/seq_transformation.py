@@ -61,37 +61,55 @@ def remove_nan_frames(ske_name, ske_joints, nan_logger):
     return ske_joints[valid_frames]
 
 
+def natural_sort(file_list):
+    return sorted(file_list, key=lambda x: int(x.split("_")[1].split(".")[0]))
+
+
 def load_data(dir_path):
-    annotation_paths = []
+    annotation_paths_list = []
     folders = [f for f in sorted(os.listdir(dir_path)) if os.path.isdir(os.path.join(dir_path, f))]
     for folder in folders:
         annotation_dir = os.path.join(dir_path, folder, "annotation")
-        annotation_paths += sorted([os.path.join(annotation_dir, f) for f in os.listdir(annotation_dir)])
+        annotation_paths_list.append(
+            [os.path.join(annotation_dir, f) for f in natural_sort(os.listdir(annotation_dir))]
+        )
 
     skes_joints = []
     frames_cnt = []
     labels = []
-    for annotation_path in annotation_paths:
-        print("dealing {}".format(annotation_path))
-        with open(annotation_path, "r") as f:
-            data = json.load(f)
-        assert "skeletons" in data, f"skeletons not found in {annotation_path}"
+    for annotation_paths in annotation_paths_list:
+        skeletons = np.empty((0, 17, 2), dtype=np.float32)
+        for annotation_path in annotation_paths:
+            print("dealing {}".format(annotation_path))
+            with open(annotation_path, "r") as f:
+                data = json.load(f)
+            assert "skeletons" in data, f"skeletons not found in {annotation_path}"
 
-        ske_joints = np.array(data["skeletons"], dtype=np.float32)
-        num_frames = int(data["length"])
-        label = int(data["label"])
+            label = int(data["label"])
+            ske_joints = np.array(data["skeletons"], dtype=np.float32)
 
+            if not np.any(ske_joints != 0.0):  # 過濾全 0 資料
+                continue
+
+            if skeletons.shape[0] == 0:
+                new_skeletons = ske_joints  # skeletons 為空時，直接加入所有骨架
+            else:
+                # 利用 broadcasting 來比較骨架是否已存在
+                is_duplicate = np.any(
+                    np.all(np.isclose(skeletons[:, None, :, :], ske_joints[None, :, :, :]), axis=(2, 3)), axis=0
+                )
+                # 只保留不重複的骨架
+                new_skeletons = ske_joints[~is_duplicate]
+
+            # 如果有新骨架，才進行 concatenate
+            if new_skeletons.shape[0] > 0:
+                skeletons = np.concatenate([skeletons, new_skeletons])
+
+        num_frames = int(skeletons.shape[0])
         if num_frames == 0:
             continue
 
-        if not np.any(ske_joints != 0.0):
-            continue
-
-        assert num_frames == ske_joints.shape[0]
-        assert ske_joints.shape[0] != 0
-        assert num_frames != 0
-
-        skes_joints.append(ske_joints)
+        skes_joints.append(skeletons)
         frames_cnt.append(num_frames)
         labels.append(label)
 

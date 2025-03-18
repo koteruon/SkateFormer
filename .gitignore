@@ -60,3 +60,7 @@ data/table_tennis_2D/fhpush_*
 data/table_tennis_2D/fhs_*
 data/jhmdb_2D/train
 data/jhmdb_2D/valid
+data/jhmdb_2D_40/train
+data/jhmdb_2D_40/valid
+data/jhmdb_2D_40/train_40
+data/jhmdb_2D_40/valid_40
