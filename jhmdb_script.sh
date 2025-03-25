@@ -13,7 +13,7 @@ do
   sed -i "s|work_dir: .*|work_dir: ./work_dir/jhmdb/SkateFormer_b_2D_20250311_${OUTPUT_NUM}/|" "$CONFIG_FILE"
 
   # 執行 python 指令，seed 直接使用數值格式
-  python main.py --config "$CONFIG_FILE" --device 1
+  python main.py --config "$CONFIG_FILE"
 
   # 增加計數
   i=$((i + 1))

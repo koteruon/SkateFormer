@@ -1,7 +1,7 @@
 # 1 不可以是0
 seed: 2
 num_worker: 4
-work_dir: ./work_dir/jhmdb/SkateFormer_b_2D_20250318_01/
+work_dir: ./work_dir/jhmdb/SkateFormer_b_2D_20250320_100/
 
 phase: train
 
@@ -13,9 +13,11 @@ train_feeder_args:
   data_type: b
   debug: False
   window_size: 32 # 64 32 16 8
-  p_interval: [0.95] # [0.5, 1]
+  # [0.5, 1]
+  p_interval: [1.00, 1]
   aug_method: '123489' # '123489'
-  intra_p: 0.75 # 0.5 Intra-instance Augmentation
+  # 0.5 Intra-instance Augmentation
+  intra_p: 0.5
   inter_p: 0.0 # 0.2 Inter-instance Augmentation
   thres: 32 # 64
   uniform: True
@@ -26,7 +28,7 @@ test_feeder_args:
   split: test
   data_type: b
   window_size: 32 # 64
-  p_interval: [0.95]
+  p_interval: [1.00, 1]
   thres: 32 # 64
   uniform: True
   partition: True
@@ -65,7 +67,7 @@ warm_up_epoch: 25 # 25
 device: [0]
 batch_size: 128 # 128
 test_batch_size: 128 # 128
-num_epoch: 500 # 500
+num_epoch: 200 # 500
 nesterov: True
 grad_clip: True
 grad_max: 1.0
