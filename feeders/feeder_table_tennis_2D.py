@@ -48,7 +48,6 @@ class Feeder(Dataset):
             self.new_idx = np.concatenate(
                 (self.left_arm, self.right_arm, self.left_leg, self.right_leg, self.torso, self.head), axis=-1
             )
-            # except for joint no.8
 
     def load_data(self):
         # data: N C V T M
