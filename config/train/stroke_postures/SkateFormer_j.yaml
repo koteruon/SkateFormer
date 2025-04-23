@@ -1,21 +1,21 @@
 # 1 不可以是0
 seed: 2
 num_worker: 4
-work_dir: ./work_dir/stroke_postures/SkateFormer_b_2D_20250325_02/
+work_dir: ./work_dir/stroke_postures/SkateFormer_j_2D_20250423_01/
 
 phase: train
 
 # feeder
-feeder: feeders.feeder_table_tennis_2D_b.Feeder
+feeder: feeders.feeder_table_tennis_2D_j.Feeder
 train_feeder_args:
   data_path: ./data/stroke_postures/stroke_posture.npz
   split: train
-  data_type: b
+  data_type: j
   debug: False
   window_size: 32 # 64 32 16 8
   # [0.5, 1]
   p_interval: [0.95]
-  aug_method: '123489' # '123489'
+  aug_method: '' # '123489'
   # 0.5 Intra-instance Augmentation
   intra_p: 0.5
   inter_p: 0.0 # 0.2 Inter-instance Augmentation
@@ -26,7 +26,7 @@ train_feeder_args:
 test_feeder_args:
   data_path: ./data/stroke_postures/stroke_posture.npz
   split: test
-  data_type: b
+  data_type: j
   window_size: 32 # 64
   p_interval: [1.00, 1]
   thres: 32 # 64

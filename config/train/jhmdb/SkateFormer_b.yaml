@@ -6,7 +6,7 @@ work_dir: ./work_dir/jhmdb/SkateFormer_b_2D_20250320_100/
 phase: train
 
 # feeder
-feeder: feeders.feeder_table_tennis_2D.Feeder
+feeder: feeders.feeder_table_tennis_2D_b.Feeder
 train_feeder_args:
   data_path: ./data/jhmdb_2D/jhmdb.npz
   split: train
