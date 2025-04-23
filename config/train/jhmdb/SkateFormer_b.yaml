@@ -1,7 +1,7 @@
 # 1 不可以是0
 seed: 2
 num_worker: 4
-work_dir: ./work_dir/jhmdb/SkateFormer_b_2D_20250320_100/
+work_dir: ./work_dir/jhmdb/SkateFormer_b_2D_20250417/
 
 phase: train
 
@@ -46,10 +46,10 @@ model_args:
   head_drop: 0.0
   rel: True
   drop_path: 0.2 # 0.2
-  type_1_size: [4, 4] # [8, 8] # 需要小於window_size//4
-  type_2_size: [4, 8] # [8, 12]
-  type_3_size: [4, 4] # [8, 8]
-  type_4_size: [4, 8] # [8, 12]
+  type_1_size: [4, 4] # [8, 8] # [N, L]
+  type_2_size: [4, 8] # [8, 12] # [N, K]
+  type_3_size: [4, 4] # [8, 8] # [M, L]
+  type_4_size: [4, 8] # [8, 12] # [M, K]
   mlp_ratio: 4.0 # 4.0
   index_t: True
 
