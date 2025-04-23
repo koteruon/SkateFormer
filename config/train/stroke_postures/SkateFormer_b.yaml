@@ -1,14 +1,14 @@
 # 1 不可以是0
 seed: 2
 num_worker: 4
-work_dir: ./work_dir/stroke_postures/SkateFormer_b_2D_20250325_02/
+work_dir: ./work_dir/stroke_postures/SkateFormer_b_2D_20250423/
 
 phase: train
 
 # feeder
 feeder: feeders.feeder_table_tennis_2D_b.Feeder
 train_feeder_args:
-  data_path: ./data/stroke_postures/stroke_posture.npz
+  data_path: ./data/stroke_postures/stroke_posture_0.2.npz
   split: train
   data_type: b
   debug: False
@@ -24,7 +24,7 @@ train_feeder_args:
   partition: True
 
 test_feeder_args:
-  data_path: ./data/stroke_postures/stroke_posture.npz
+  data_path: ./data/stroke_postures/stroke_posture_0.2.npz
   split: test
   data_type: b
   window_size: 32 # 64
