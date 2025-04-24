@@ -1,7 +1,7 @@
 # 1 不可以是0
 seed: 99
 num_worker: 4
-work_dir: ./work_dir/stroke_postures/SkateFormer_j_2D_20250423_0_2_99/
+work_dir: ./work_dir/stroke_postures/SkateFormer_j_2D_20250423_test/
 
 phase: train
 
@@ -35,7 +35,7 @@ test_feeder_args:
   debug: False
 
 # model
-model: model.SkateFormer_2D_for_hit.SkateFormer_
+model: model.SkateFormer_2D_Eit.SkateFormer_
 model_args:
   num_classes: 9 # 60
   num_people: 1 # 2
