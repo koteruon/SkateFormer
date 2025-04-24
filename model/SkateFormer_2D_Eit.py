@@ -215,23 +215,16 @@ class MultiHeadSelfAttention(nn.Module):
         v = self.fc_v(v)
 
         # Compute attention maps for all head pairs
-        attention_map = []
-        for i in range(self.num_heads ** 2):
-            curr_q = i // self.num_heads  # Query head index
-            curr_k = i % self.num_heads   # Key head index
-            # Compute attention scores: (B, N, N)
-            attn = torch.einsum('blk,btk->blt', q[:, curr_q], k[:, curr_k]) / (self.head_dim ** 0.5)
-            if self.rel:
-                # Add relative positional bias for the head pair
-                rel_bias = self._get_relative_positional_bias()[:, i]  # Select bias for current head pair
-                attn = attn + rel_bias
-                attention_map.append(attn)
+        attn = torch.einsum('b h n d, b k m d -> b h k n m', q, k) / (self.head_dim ** 0.5)
+        if self.rel:
+            rel_bias = self._get_relative_positional_bias().view(1, self.num_heads, self.num_heads, N, N)
+            attn = attn + rel_bias
 
-        # Stack attention maps: (num_heads^2, B, N, N)
-        attention_map = torch.stack(attention_map, dim=0)
+        # Reshape and permute to (num_heads^2, B_, N, N)
+        attn = attn.reshape(B_, self.num_heads * self.num_heads, N, N).permute(1, 0, 2, 3)
 
         # Apply convolutional operation
-        attention_map = self.conv_op(attention_map)  # Shape: (num_heads, B, N, N)
+        attention_map = self.conv_op(attn)  # Shape: (num_heads, B, N, N)
 
         # Compute context vector
         v = rearrange(v, 'b h n c -> h b n c')
