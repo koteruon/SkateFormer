@@ -115,7 +115,6 @@ class MultiHeadSelfAttention(nn.Module):
         self.scale = self.dim_per_head**-0.5
 
         total_dim = self.dim_per_head * num_heads
-        self.f_QKV = nn.Linear(in_channels, total_dim * 3)
         self.f_cat = nn.Linear(total_dim, in_channels)
 
         self.f_Qk1 = nn.Linear(num_heads, num_heads)
@@ -171,14 +170,17 @@ class MultiHeadSelfAttention(nn.Module):
         B, N, C = input.shape
         assert N == self.seq_len, f"Expected sequence length {self.seq_len}, but got {N}"
 
-        qkv = self.f_QKV(input)  # (B, N, 3*h*d)
-        qkv = qkv.view(B, N, 3, self.num_heads, self.dim_per_head).permute(2, 3, 1, 4)  # (3, h, N, d)
-        Q, K, V = qkv[0], qkv[1], qkv[2]  # (h, N, d)
+        qkv = input.reshape(B, N, 3, self.num_heads, self.dim_per_head).permute(2, 0, 3, 1, 4)
+        Q, K, V = qkv[0], qkv[1], qkv[2]  # (B, h, N, d)
 
         # Generate landmarks via pooling
         landmark_L = max(1, self.seq_len // 4)
-        q = F.adaptive_avg_pool1d(Q.permute(0, 2, 1), landmark_L).permute(0, 2, 1)  # (h, L, d)
-        k = F.adaptive_avg_pool1d(K.permute(0, 2, 1), landmark_L).permute(0, 2, 1)  # (h, L, d)
+        Q_reshaped = Q.permute(0, 1, 3, 2).reshape(B * self.num_heads, self.dim_per_head, N)  # (B*h, L, d)
+        q = F.adaptive_avg_pool1d(Q_reshaped, output_size=landmark_L)  # (B*h, L, d)
+        q = q.permute(0, 2, 1).reshape(B, self.num_heads, landmark_L, self.dim_per_head)  # (B, h, L, d)
+        K_reshaped = K.permute(0, 1, 3, 2).reshape(B * self.num_heads, self.dim_per_head, N)  # (B*h, L, d)
+        k = F.adaptive_avg_pool1d(K_reshaped, output_size=landmark_L)  # (B*h, L, d)
+        k = k.permute(0, 2, 1).reshape(B, self.num_heads, landmark_L, self.dim_per_head)  # (B, h, L, d)
 
         # Qk attention
         Qk = torch.matmul(Q, k.transpose(-2, -1)) * self.scale  # (h, N, L)
