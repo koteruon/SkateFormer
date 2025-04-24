@@ -4,6 +4,7 @@ from typing import List, Optional, Set, Tuple, Type, Union
 import numpy as np
 import torch
 import torch.nn as nn
+from einops import rearrange
 from timm.models.layers import (
     DropPath,
     Mlp,
@@ -13,7 +14,6 @@ from timm.models.layers import (
     get_norm_act_layer,
     trunc_normal_,
 )
-from einops import rearrange
 
 """ Partition and Reverse """
 
@@ -99,33 +99,49 @@ def get_relative_position_index_1d(T):
 
 
 """ MSA """
+
+
 class ConvolutionOp(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, groups: int, h_isi: int, h_csi: int):
         super().__init__()
-        self.conv_inner_subspace_1 = nn.Conv2d(in_channels=in_channels, out_channels=h_isi, kernel_size=1, groups=groups)
-        self.conv_inner_subspace_2 = nn.Conv2d(in_channels=h_isi, out_channels=out_channels, kernel_size=1, groups=groups)
-        self.conv_cross_subspace_1 = nn.Conv2d(in_channels=out_channels, out_channels=h_csi, kernel_size=1, groups=groups)
-        self.conv_cross_subspace_2 = nn.Conv2d(in_channels=h_csi, out_channels=out_channels, kernel_size=1, groups=groups)
+        self.conv_inner_subspace_1 = nn.Conv2d(
+            in_channels=in_channels, out_channels=h_isi, kernel_size=1, groups=groups
+        )
+        self.conv_inner_subspace_2 = nn.Conv2d(
+            in_channels=h_isi, out_channels=out_channels, kernel_size=1, groups=groups
+        )
+        self.conv_cross_subspace_1 = nn.Conv2d(
+            in_channels=out_channels, out_channels=h_csi, kernel_size=1, groups=groups
+        )
+        self.conv_cross_subspace_2 = nn.Conv2d(
+            in_channels=h_csi, out_channels=out_channels, kernel_size=1, groups=groups
+        )
 
     def forward(self, attn_map):
-        attn_map = rearrange(attn_map, 'head b t d -> b head t d')
+        attn_map = rearrange(attn_map, "head b t d -> b head t d")
         s_dot = self.conv_inner_subspace_2(nn.ReLU()(self.conv_inner_subspace_1(attn_map)))
         s_double_dot = self.conv_cross_subspace_2(nn.ReLU()(self.conv_cross_subspace_1(s_dot)))
-        s_double_dot = rearrange(s_double_dot, 'b head t d -> head b t d')
+        s_double_dot = rearrange(s_double_dot, "b head t d -> head b t d")
         return s_double_dot
+
 
 class EfficientConvOp(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, groups: int, common_channels: int):
         super().__init__()
-        self.conv_inner_subspace_1 = nn.Conv2d(in_channels=in_channels, out_channels=common_channels, kernel_size=1, groups=groups)
-        self.conv_cross_subspace_1 = nn.Conv2d(in_channels=common_channels, out_channels=out_channels, kernel_size=1, groups=groups)
+        self.conv_inner_subspace_1 = nn.Conv2d(
+            in_channels=in_channels, out_channels=common_channels, kernel_size=1, groups=groups
+        )
+        self.conv_cross_subspace_1 = nn.Conv2d(
+            in_channels=common_channels, out_channels=out_channels, kernel_size=1, groups=groups
+        )
 
     def forward(self, attn_map):
-        attn_map = rearrange(attn_map, 'head b t d -> b head t d')
+        attn_map = rearrange(attn_map, "head b t d -> b head t d")
         s_dot = nn.ReLU()(self.conv_inner_subspace_1(attn_map))
         s_double_dot = self.conv_cross_subspace_1(s_dot)
-        s_double_dot = rearrange(s_double_dot, 'b head t d -> head b t d')
+        s_double_dot = rearrange(s_double_dot, "b head t d -> head b t d")
         return s_double_dot
+
 
 class MultiHeadSelfAttention(nn.Module):
     def __init__(self, in_channels, rel_type, num_heads=32, partition_size=(1, 1), attn_drop=0.0, rel=True):
@@ -144,40 +160,34 @@ class MultiHeadSelfAttention(nn.Module):
         self.fc_v = nn.Linear(self.head_dim, self.head_dim)
 
         # Output projection
-        self.to_out = nn.Sequential(
-            nn.Linear(in_channels, in_channels),
-            nn.Dropout(attn_drop)
-        )
+        self.to_out = nn.Sequential(nn.Linear(in_channels, in_channels), nn.Dropout(attn_drop))
 
         self.use_efficient = True
         # Convolutional operation for head interactions
         if self.use_efficient:
             self.conv_op = EfficientConvOp(
-                in_channels=num_heads ** 2,
-                out_channels=num_heads,
-                groups=num_heads,
-                common_channels=2 * num_heads
+                in_channels=num_heads**2, out_channels=num_heads, groups=num_heads, common_channels=2 * num_heads
             )
         else:
             self.conv_op = ConvolutionOp(
-                in_channels=num_heads ** 2,
+                in_channels=num_heads**2,
                 out_channels=num_heads,
                 groups=num_heads,
                 h_isi=8 * num_heads,
-                h_csi=4 * num_heads
+                h_csi=4 * num_heads,
             )
 
         # Relative positional bias
         if self.rel:
             if self.rel_type == "type_1" or self.rel_type == "type_3":
                 # Adjusted for n_heads^2 to support head-pair interactions
-                self.relative_position_bias_table = nn.Parameter(torch.zeros((2 * partition_size[0] - 1), num_heads ** 2))
+                self.relative_position_bias_table = nn.Parameter(torch.zeros((2 * partition_size[0] - 1), num_heads**2))
                 self.register_buffer("relative_position_index", get_relative_position_index_1d(partition_size[0]))
                 trunc_normal_(self.relative_position_bias_table, std=0.02)
                 self.ones = torch.ones(partition_size[1], partition_size[1], num_heads)
             elif self.rel_type == "type_2" or self.rel_type == "type_4":
                 self.relative_position_bias_table = nn.Parameter(
-                    torch.zeros((2 * partition_size[0] - 1), partition_size[1], partition_size[1], num_heads ** 2)
+                    torch.zeros((2 * partition_size[0] - 1), partition_size[1], partition_size[1], num_heads**2)
                 )
                 self.register_buffer("relative_position_index", get_relative_position_index_1d(partition_size[0]))
                 trunc_normal_(self.relative_position_bias_table, std=0.02)
@@ -210,12 +220,12 @@ class MultiHeadSelfAttention(nn.Module):
         qkv = input.reshape(B_, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv.unbind(0)
 
-        q = self.fc_q(q)
+        q = self.fc_q(q) / (self.head_dim**0.5)
         k = self.fc_k(k)
         v = self.fc_v(v)
 
         # Compute attention maps for all head pairs
-        attn = torch.einsum('b h n d, b k m d -> b h k n m', q, k) / (self.head_dim ** 0.5)
+        attn = torch.einsum("b h n d, b k m d -> b h k n m", q, k)
         if self.rel:
             rel_bias = self._get_relative_positional_bias().view(1, self.num_heads, self.num_heads, N, N)
             attn = attn + rel_bias
@@ -228,8 +238,8 @@ class MultiHeadSelfAttention(nn.Module):
 
         # Compute context vector
         v = v.permute(1, 0, 2, 3)
-        context_vector = torch.einsum('hblt,hbtv->hblv', attention_map, v)
-        context_vector = rearrange(context_vector, 'h b t d -> b t (h d)')
+        context_vector = torch.einsum("hblt,hbtv->hblv", attention_map, v)
+        context_vector = rearrange(context_vector, "h b t d -> b t (h d)")
 
         # Output projection
         output = self.to_out(context_vector)
