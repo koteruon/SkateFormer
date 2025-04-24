@@ -149,7 +149,7 @@ class MultiHeadSelfAttention(nn.Module):
             nn.Dropout(attn_drop)
         )
 
-        self.use_efficient = False
+        self.use_efficient = True
         # Convolutional operation for head interactions
         if self.use_efficient:
             self.conv_op = EfficientConvOp(
