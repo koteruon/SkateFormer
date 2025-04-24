@@ -1,14 +1,28 @@
-import numpy as np
 import random
 
+import numpy as np
 from torch.utils.data import Dataset
+
 from feeders import tools
 
 
 class Feeder(Dataset):
-    def __init__(self, data_path, label_path=None, p_interval=1, split='train', data_type='j',
-                 aug_method='z', intra_p=0.5, inter_p=0.0, window_size=-1,
-                 debug=False, thres=64, uniform=False, partition=False):
+    def __init__(
+        self,
+        data_path,
+        label_path=None,
+        p_interval=1,
+        split="train",
+        data_type="j",
+        aug_method="z",
+        intra_p=0.5,
+        inter_p=0.0,
+        window_size=-1,
+        debug=False,
+        thres=64,
+        uniform=False,
+        partition=False,
+    ):
 
         self.debug = debug
         self.data_path = data_path
@@ -31,15 +45,17 @@ class Feeder(Dataset):
             self.left_leg = np.array([17, 18, 19, 20]) - 1
             self.h_torso = np.array([5, 9, 6, 10]) - 1
             self.w_torso = np.array([2, 3, 1, 4]) - 1
-            self.new_idx = np.concatenate((self.right_arm, self.left_arm, self.right_leg, self.left_leg, self.h_torso, self.w_torso), axis=-1)
+            self.new_idx = np.concatenate(
+                (self.right_arm, self.left_arm, self.right_leg, self.left_leg, self.h_torso, self.w_torso), axis=-1
+            )
             # except for joint no.21
 
     def load_data(self):
         # data: N C V T M
         npz_data = np.load(self.data_path)
-        if self.split == 'train':
-            data = npz_data['x_train']
-            label = np.where(npz_data['y_train'] > 0)[1]
+        if self.split == "train":
+            data = npz_data["x_train"]
+            label = np.where(npz_data["y_train"] > 0)[1]
             inter_idx = np.where(((label >= 49) & (label <= 59)) | ((label >= 105) & (label <= 119)))
             self.data = data[inter_idx]
             self.label = label[inter_idx]
@@ -48,10 +64,10 @@ class Feeder(Dataset):
                     self.label[i] = self.label[i] - 49
                 else:
                     self.label[i] = self.label[i] - 105 + 11
-            self.sample_name = ['train_' + str(i) for i in range(len(self.data))]
-        elif self.split == 'test':
-            data = npz_data['x_test']
-            label = np.where(npz_data['y_test'] > 0)[1]
+            self.sample_name = ["train_" + str(i) for i in range(len(self.data))]
+        elif self.split == "test":
+            data = npz_data["x_test"]
+            label = np.where(npz_data["y_test"] > 0)[1]
             inter_idx = np.where(((label >= 49) & (label <= 59)) | ((label >= 105) & (label <= 119)))
             self.data = data[inter_idx]
             self.label = label[inter_idx]
@@ -60,9 +76,9 @@ class Feeder(Dataset):
                     self.label[i] = self.label[i] - 49
                 else:
                     self.label[i] = self.label[i] - 105 + 11
-            self.sample_name = ['test_' + str(i) for i in range(len(self.data))]
+            self.sample_name = ["test_" + str(i) for i in range(len(self.data))]
         else:
-            raise NotImplementedError('data split only supports train/test')
+            raise NotImplementedError("data split only supports train/test")
         N, T, _ = self.data.shape
         self.data = self.data.reshape((N, T, 2, 25, 3)).transpose(0, 4, 1, 3, 2)
 
@@ -80,21 +96,23 @@ class Feeder(Dataset):
         num_people = np.sum(data_numpy.sum(0).sum(0).sum(0) != 0)
 
         if self.uniform:
-            data_numpy, index_t = tools.valid_crop_uniform(data_numpy, valid_frame_num, self.p_interval,
-                                                           self.window_size, self.thres)
+            data_numpy, index_t = tools.valid_crop_uniform(
+                data_numpy, valid_frame_num, self.p_interval, self.window_size, self.thres
+            )
         else:
-            data_numpy, index_t = tools.valid_crop_resize(data_numpy, valid_frame_num, self.p_interval,
-                                                          self.window_size, self.thres)
+            data_numpy, index_t = tools.valid_crop_resize(
+                data_numpy, valid_frame_num, self.p_interval, self.window_size, self.thres
+            )
 
-        if self.split == 'train':
+        if self.split == "train":
             # intra-instance augmentation
             p = np.random.rand(1)
             if p < self.intra_p:
 
-                if 'a' in self.aug_method:
+                if "a" in self.aug_method:
                     if np.random.rand(1) < 0.5:
                         data_numpy = data_numpy[:, :, :, np.array([1, 0])]
-                if 'b' in self.aug_method:
+                if "b" in self.aug_method:
                     if num_people == 2:
                         if np.random.rand(1) < 0.5:
                             axis_next = np.random.randint(0, 1)
@@ -104,23 +122,23 @@ class Feeder(Dataset):
                             temp[:, :, :, axis_next] = x_new
                             data_numpy = temp
 
-                if '1' in self.aug_method:
+                if "1" in self.aug_method:
                     data_numpy = tools.shear(data_numpy, p=0.5)
-                if '2' in self.aug_method:
+                if "2" in self.aug_method:
                     data_numpy = tools.rotate(data_numpy, p=0.5)
-                if '3' in self.aug_method:
+                if "3" in self.aug_method:
                     data_numpy = tools.scale(data_numpy, p=0.5)
-                if '4' in self.aug_method:
+                if "4" in self.aug_method:
                     data_numpy = tools.spatial_flip(data_numpy, p=0.5)
-                if '5' in self.aug_method:
+                if "5" in self.aug_method:
                     data_numpy, index_t = tools.temporal_flip(data_numpy, index_t, p=0.5)
-                if '6' in self.aug_method:
+                if "6" in self.aug_method:
                     data_numpy = tools.gaussian_noise(data_numpy, p=0.5)
-                if '7' in self.aug_method:
+                if "7" in self.aug_method:
                     data_numpy = tools.gaussian_filter(data_numpy, p=0.5)
-                if '8' in self.aug_method:
+                if "8" in self.aug_method:
                     data_numpy = tools.drop_axis(data_numpy, p=0.5)
-                if '9' in self.aug_method:
+                if "9" in self.aug_method:
                     data_numpy = tools.drop_joint(data_numpy, p=0.5)
 
             # inter-instance augmentation
@@ -129,7 +147,7 @@ class Feeder(Dataset):
                 data_adain = self.data[adain_idx]
                 data_adain = np.array(data_adain)
                 f_num = np.sum(data_adain.sum(0).sum(-1).sum(-1) != 0)
-                t_idx = np.round((index_t + 1) * f_num / 2).astype(np.int)
+                t_idx = np.round((index_t + 1) * f_num / 2).astype(32)
                 data_adain = data_adain[:, t_idx]
                 data_numpy = tools.skeleton_adain_bone_length(data_numpy, data_adain)
 
@@ -137,12 +155,12 @@ class Feeder(Dataset):
                 data_numpy = data_numpy.copy()
 
         # modality
-        if self.data_type == 'b':
+        if self.data_type == "b":
             j2b = tools.joint2bone()
             data_numpy = j2b(data_numpy)
-        elif self.data_type == 'jm':
+        elif self.data_type == "jm":
             data_numpy = tools.to_motion(data_numpy)
-        elif self.data_type == 'bm':
+        elif self.data_type == "bm":
             j2b = tools.joint2bone()
             data_numpy = j2b(data_numpy)
             data_numpy = tools.to_motion(data_numpy)
@@ -161,9 +179,8 @@ class Feeder(Dataset):
 
 
 def import_class(name):
-    components = name.split('.')
+    components = name.split(".")
     mod = __import__(components[0])
     for comp in components[1:]:
         mod = getattr(mod, comp)
     return mod
-
