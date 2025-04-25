@@ -118,7 +118,6 @@ class MultiHeadSelfAttention(nn.Module):
                 self.relative_position_bias_table = nn.Parameter(torch.zeros((2 * partition_size[0] - 1), num_heads))
                 self.register_buffer("relative_position_index", get_relative_position_index_1d(partition_size[0]))
                 trunc_normal_(self.relative_position_bias_table, std=0.02)
-                self.ones = torch.ones(partition_size[1], partition_size[1], num_heads)
             elif self.rel_type == "type_2" or self.rel_type == "type_4":
                 self.relative_position_bias_table = nn.Parameter(
                     torch.zeros((2 * partition_size[0] - 1), partition_size[1], partition_size[1], num_heads)
