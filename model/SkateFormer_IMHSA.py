@@ -265,6 +265,7 @@ class MultiHeadSelfAttention(nn.Module):
             Qk = Qk + bias_Qk  # 添加相對位置偏置
         Qk = self.interaction(Qk, self.f_Qk1)
         Qk = self.softmax(Qk)
+        Qk = self.attn_drop(Qk)
         Qk = self.interaction(Qk, self.f_Qk2)
 
         # qK attention
@@ -273,6 +274,7 @@ class MultiHeadSelfAttention(nn.Module):
             qK = qK + bias_qK  # 添加相對位置偏置
         qK = self.interaction(qK, self.f_qK1)
         qK = self.softmax(qK)
+        qk = self.attn_drop(qK)
         qK = self.interaction(qK, self.f_qK2)
 
         # Final attention
