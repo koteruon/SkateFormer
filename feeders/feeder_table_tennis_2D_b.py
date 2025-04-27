@@ -39,15 +39,15 @@ class Feeder(Dataset):
         self.partition = partition
         self.load_data()
         if partition:
-            self.right_arm = np.array([11, 12, 13])
-            self.left_arm = np.array([14, 15, 16])
-            self.right_leg = np.array([4, 5, 6])
-            self.left_leg = np.array([1, 2, 3])
-            self.torso = np.array([7, 9, 0, 10])
+            self.left_arm = np.array([10, 11])  # (5,7), (7,9)
+            self.right_arm = np.array([8, 9])  # (6,8), (8,10)
+            self.left_leg = np.array([14, 15])  # (11,13), (13,15)
+            self.right_leg = np.array([12, 13])  # (12,14), (14,16)
+            self.torso = np.array([4, 5, 6, 7])  # (6,5), (12,11), (6,12), (5,11)
+            self.head = np.array([0, 1, 2, 3])  # (0,2), (0,1), (2,4), (1,3)
             self.new_idx = np.concatenate(
-                (self.right_arm, self.left_arm, self.right_leg, self.left_leg, self.torso), axis=-1
+                (self.left_arm, self.right_arm, self.left_leg, self.right_leg, self.torso, self.head), axis=-1
             )
-            # except for joint no.8
 
     def load_data(self):
         # data: N C V T M

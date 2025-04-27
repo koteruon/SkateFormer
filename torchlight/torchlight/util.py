@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 import yaml
 from torch.autograd import Variable
-from torchpack.runner.hooks import PaviLogger
+from torch.utils.tensorboard import SummaryWriter
 
 
 class IO:
@@ -24,20 +24,18 @@ class IO:
         self.print_to_screen = print_log
         self.cur_time = time.time()
         self.split_timer = {}
-        self.pavi_logger = None
+        self.tensorboard_logger = None
         self.session_file = None
         self.model_text = ""
 
     def log(self, *args, **kwargs):
         try:
-            if self.pavi_logger is None:
-                url = "http://pavi.parrotsdnn.org/log"
+            if self.tensorboard_logger is None:
+                self.tensorboard_logger = SummaryWriter(log_dir=self.work_dir)
                 with open(self.session_file, "r") as f:
                     info = dict(session_file=self.session_file, session_text=f.read(), model_text=self.model_text)
-                self.pavi_logger = PaviLogger(url)
-                self.pavi_logger.connect(self.work_dir, info=info)
-            self.pavi_logger.log(*args, **kwargs)
-        except:  # pylint: disable=W0702
+            self.tensorboard_logger.add_scalar(*args, **kwargs)  # 假設你在紀錄標量，根據需要修改
+        except Exception as e:
             pass
 
     def load_model(self, model, **model_args):

@@ -4,6 +4,7 @@ from typing import List, Optional, Set, Tuple, Type, Union
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from timm.models.layers import (
     DropPath,
     Mlp,
@@ -97,6 +98,30 @@ def get_relative_position_index_1d(T):
     return relative_coords.sum(-1)
 
 
+def get_relative_position_index_1d_landmarks(T, num_landmarks):
+    # 計算高度和寬度方向的 kernel 大小
+    kernel_size_h = T // num_landmarks  # 高度方向的 kernel 大小
+    kernel_size_w = T // num_landmarks  # 寬度方向的 kernel 大小
+
+    # token 位置
+    coords_h = torch.arange(T)
+    coords_w = torch.arange(T)
+
+    # 地標位置（位於 kernel 中心）
+    coords_l_h = torch.arange(num_landmarks) * kernel_size_h + kernel_size_h // 2  # 高度方向地標位置
+    coords_l_w = torch.arange(num_landmarks) * kernel_size_w + kernel_size_w // 2  # 寬度方向地標位置
+
+    # 為 Qk 計算索引：高度方向 token - 寬度方向地標
+    relative_coords_Qk = coords_h.view(-1, 1) - coords_l_w.view(1, -1)  # 形狀 (H, num_landmarks)
+    relative_coords_Qk = relative_coords_Qk + (T - 1)  # 偏移到 [0, 2*(H-1)]
+
+    # 為 qK 計算索引：高度方向地標 - 寬度方向 token
+    relative_coords_qK = coords_l_h.view(-1, 1) - coords_w.view(1, -1)  # 形狀 (num_landmarks, W)
+    relative_coords_qK = relative_coords_qK + (T - 1)  # 偏移到 [0, 2*(H-1)]
+
+    return relative_coords_Qk, relative_coords_qK
+
+
 """ MSA """
 
 
@@ -107,59 +132,156 @@ class MultiHeadSelfAttention(nn.Module):
         self.rel_type = rel_type
         self.num_heads = num_heads
         self.partition_size = partition_size
-        self.scale = num_heads**-0.5
-        self.attn_area = partition_size[0] * partition_size[1]
-        self.attn_drop = nn.Dropout(p=attn_drop)
-        self.softmax = nn.Softmax(dim=-1)
         self.rel = rel
+
+        self.seq_len = self.partition_size[0] * self.partition_size[1]
+        self.dim_per_head = self.in_channels // self.num_heads
+        self.scale = self.dim_per_head**-0.5
+        self.landmark_L_scale = 2
+        self.landmark_L = max(1, self.seq_len // self.landmark_L_scale)
+
+        # Q, K, V 投影
+        # self.qkv = nn.Linear(dim, dim * 3)
+
+        # 輸出投影
+        total_dim = self.dim_per_head * self.num_heads
+        self.f_cat = nn.Linear(total_dim, self.in_channels)
+
+        # 交互層
+        self.f_Qk1 = nn.Linear(self.num_heads, self.num_heads)
+        self.f_Qk2 = nn.Linear(self.num_heads, self.num_heads)
+        self.f_qK1 = nn.Linear(self.num_heads, self.num_heads)
+        self.f_qK2 = nn.Linear(self.num_heads, self.num_heads)
+
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.softmax = nn.Softmax(dim=-1)
 
         if self.rel:
             if self.rel_type == "type_1" or self.rel_type == "type_3":
-                self.relative_position_bias_table = nn.Parameter(torch.zeros((2 * partition_size[0] - 1), num_heads))
-                self.register_buffer("relative_position_index", get_relative_position_index_1d(partition_size[0]))
+                self.relative_position_bias_table = nn.Parameter(
+                    torch.zeros((2 * partition_size[0] - 1), self.num_heads)
+                )
+                relative_position_index_Qk, relative_position_index_qK = get_relative_position_index_1d_landmarks(
+                    partition_size[0], partition_size[0] // self.landmark_L_scale
+                )
+                self.register_buffer("relative_position_index_Qk", relative_position_index_Qk)
+                self.register_buffer("relative_position_index_qK", relative_position_index_qK)
                 trunc_normal_(self.relative_position_bias_table, std=0.02)
             elif self.rel_type == "type_2" or self.rel_type == "type_4":
                 self.relative_position_bias_table = nn.Parameter(
-                    torch.zeros((2 * partition_size[0] - 1), partition_size[1], partition_size[1], num_heads)
+                    torch.zeros((2 * partition_size[0] - 1), partition_size[1], partition_size[1], self.num_heads)
                 )
-                self.register_buffer("relative_position_index", get_relative_position_index_1d(partition_size[0]))
+                relative_position_index_Qk, relative_position_index_qK = get_relative_position_index_1d_landmarks(
+                    partition_size[0], partition_size[0] // self.landmark_L_scale
+                )
+                self.register_buffer("relative_position_index_Qk", relative_position_index_Qk)
+                self.register_buffer("relative_position_index_qK", relative_position_index_qK)
                 trunc_normal_(self.relative_position_bias_table, std=0.02)
 
     def _get_relative_positional_bias(self):
         if self.rel_type == "type_1" or self.rel_type == "type_3":
-            relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
-                self.partition_size[0], self.partition_size[0], -1
+            # 對 Qk (N, L)
+            bias_Qk = self.relative_position_bias_table[self.relative_position_index_Qk.view(-1)].view(
+                self.partition_size[0], self.partition_size[0] // self.landmark_L_scale, -1
             )
-            relative_position_bias = (
-                relative_position_bias.unsqueeze(1)
+            bias_Qk = (
+                bias_Qk.unsqueeze(1)
                 .unsqueeze(3)
                 .repeat(1, self.partition_size[1], 1, self.partition_size[1], 1, 1)
-                .view(self.attn_area, self.attn_area, -1)
+                .view(self.seq_len, self.landmark_L, -1)
             )
-            relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()
-            return relative_position_bias.unsqueeze(0)
+            bias_Qk = bias_Qk.permute(2, 0, 1).contiguous()  # (num_heads, N, L)
+            bias_Qk = bias_Qk.unsqueeze(0)  # (1, num_heads, N, L)
+            # 對 qK (L, N)
+            bias_qK = self.relative_position_bias_table[self.relative_position_index_qK.view(-1)].view(
+                self.partition_size[0] // self.landmark_L_scale, self.partition_size[0], -1
+            )
+            bias_qK = (
+                bias_qK.unsqueeze(1)
+                .unsqueeze(3)
+                .repeat(1, self.partition_size[1], 1, self.partition_size[1], 1, 1)
+                .view(self.landmark_L, self.seq_len, -1)
+            )
+            bias_qK = bias_qK.permute(2, 0, 1).contiguous()  # (num_heads, L, N)
+            bias_qK = bias_qK.unsqueeze(0)  # (1, num_heads, L, N)
+            return bias_Qk, bias_qK
         elif self.rel_type == "type_2" or self.rel_type == "type_4":
-            relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
-                self.partition_size[0], self.partition_size[0], self.partition_size[1], self.partition_size[1], -1
+            # 對 Qk (N, L)
+            bias_Qk = self.relative_position_bias_table[self.relative_position_index_Qk.view(-1)].view(
+                self.partition_size[0],
+                self.partition_size[0] // self.landmark_L_scale,
+                self.partition_size[1],
+                self.partition_size[1],
+                -1,
             )
-            relative_position_bias = (
-                relative_position_bias.permute(0, 2, 1, 3, 4).contiguous().view(self.attn_area, self.attn_area, -1)
+            bias_Qk = bias_Qk.permute(0, 2, 1, 3, 4).contiguous().view(self.seq_len, self.landmark_L, -1)
+            bias_Qk = bias_Qk.permute(2, 0, 1).contiguous()  # (num_heads, N, L)
+            bias_Qk = bias_Qk.unsqueeze(0)  # (1, num_heads, N, L)
+            # 對 qK (L, N)
+            bias_qK = self.relative_position_bias_table[self.relative_position_index_qK.view(-1)].view(
+                self.partition_size[0] // self.landmark_L_scale,
+                self.partition_size[0],
+                self.partition_size[1],
+                self.partition_size[1],
+                -1,
             )
-            relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()
-            return relative_position_bias.unsqueeze(0)
+            bias_qK = bias_qK.permute(0, 2, 1, 3, 4).contiguous().view(self.landmark_L, self.seq_len, -1)
+            bias_qK = bias_qK.permute(2, 0, 1).contiguous()  # (num_heads, L, N)
+            bias_qK = bias_qK.unsqueeze(0)  # (1, num_heads, L, N)
+            return bias_Qk, bias_qK
+
+    def interaction(self, attn, layer):
+        attn = attn.permute(0, 2, 3, 1)  # (B, h, N, L) -> (B, N, L, h)
+        attn = layer(attn)
+        return attn.permute(0, 3, 1, 2)  # (B, N, L, h) -> (B, h, N, L)
 
     def forward(self, input):
-        B_, N, C = input.shape
-        qkv = input.reshape(B_, N, 3, self.num_heads, -1).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv.unbind(0)
-        q = q * self.scale
-        attn = q @ k.transpose(-2, -1)
+        B, N, C = input.shape
+        assert N == self.seq_len, f"Expected sequence length {self.seq_len}, but got {N}"
+
+        qkv = input.reshape(B, N, 3, self.num_heads, self.dim_per_head).permute(2, 0, 3, 1, 4)
+        Q, K, V = qkv[0], qkv[1], qkv[2]  # (B, h, N, d)
+
+        # Generate landmarks via pooling
+        kernel_size = max(1, N // self.landmark_L)
+        assert N % kernel_size == 0, f"N={N} cannot be divided by kernel_size={kernel_size}"
+        stride = kernel_size
+        Q_reshaped = Q.permute(0, 1, 3, 2).reshape(B * self.num_heads, self.dim_per_head, N)  # (B*h, L, d)
+        q = F.avg_pool1d(Q_reshaped, kernel_size=kernel_size, stride=stride)  # (B*h, L, d)
+        q = q.permute(0, 2, 1).reshape(B, self.num_heads, self.landmark_L, self.dim_per_head)  # (B, h, L, d)
+        K_reshaped = K.permute(0, 1, 3, 2).reshape(B * self.num_heads, self.dim_per_head, N)  # (B*h, L, d)
+        k = F.avg_pool1d(K_reshaped, kernel_size=kernel_size, stride=stride)  # (B*h, L, d)
+        k = k.permute(0, 2, 1).reshape(B, self.num_heads, self.landmark_L, self.dim_per_head)  # (B, h, L, d)
+
+        # 獲取相對位置偏置
         if self.rel:
-            attn = attn + self._get_relative_positional_bias()
-        attn = self.softmax(attn)
-        attn = self.attn_drop(attn)
-        output = (attn @ v).transpose(1, 2).reshape(B_, N, -1)
-        return output
+            bias_Qk, bias_qK = self._get_relative_positional_bias()
+        else:
+            bias_Qk, bias_qK = None, None
+
+        # Qk attention
+        Qk = torch.matmul(Q, k.transpose(-2, -1)) * self.scale  # (B, h, N, L)
+        if bias_Qk is not None:
+            Qk = Qk + bias_Qk  # 添加相對位置偏置
+        Qk = self.interaction(Qk, self.f_Qk1)
+        Qk = self.softmax(Qk)
+        Qk = self.attn_drop(Qk)
+        Qk = self.interaction(Qk, self.f_Qk2)
+
+        # qK attention
+        qK = torch.matmul(q, K.transpose(-2, -1)) * self.scale  # (B, h, L, N)
+        if bias_qK is not None:
+            qK = qK + bias_qK  # 添加相對位置偏置
+        qK = self.interaction(qK, self.f_qK1)
+        qK = self.softmax(qK)
+        qk = self.attn_drop(qK)
+        qK = self.interaction(qK, self.f_qK2)
+
+        # Final attention
+        out = torch.matmul(Qk, torch.matmul(qK, V))  # (B, h, N, d)
+        out = out.permute(0, 2, 1, 3).reshape(B, N, -1)
+        out = self.f_cat(out)
+        return out
 
 
 """ SkateFormer Block """
@@ -412,7 +534,7 @@ class SkateFormerStage(nn.Module):
 class SkateFormer(nn.Module):
     def __init__(
         self,
-        in_channels=2,
+        in_channels=3,
         depths=(2, 2, 2, 2),
         channels=(96, 192, 192, 192),
         num_classes=60,

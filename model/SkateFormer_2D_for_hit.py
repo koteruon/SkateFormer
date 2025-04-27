@@ -4,15 +4,8 @@ from typing import List, Optional, Set, Tuple, Type, Union
 import numpy as np
 import torch
 import torch.nn as nn
-from timm.models.layers import (
-    DropPath,
-    Mlp,
-    create_act_layer,
-    create_conv2d,
-    drop_path,
-    get_norm_act_layer,
-    trunc_normal_,
-)
+from timm.models.layers import (DropPath, Mlp, create_act_layer, create_conv2d,
+                                drop_path, get_norm_act_layer, trunc_normal_)
 
 """ Partition and Reverse """
 
@@ -118,6 +111,7 @@ class MultiHeadSelfAttention(nn.Module):
                 self.relative_position_bias_table = nn.Parameter(torch.zeros((2 * partition_size[0] - 1), num_heads))
                 self.register_buffer("relative_position_index", get_relative_position_index_1d(partition_size[0]))
                 trunc_normal_(self.relative_position_bias_table, std=0.02)
+                self.ones = torch.ones(partition_size[1], partition_size[1], num_heads)
             elif self.rel_type == "type_2" or self.rel_type == "type_4":
                 self.relative_position_bias_table = nn.Parameter(
                     torch.zeros((2 * partition_size[0] - 1), partition_size[1], partition_size[1], num_heads)
@@ -513,7 +507,11 @@ class SkateFormer(nn.Module):
             )
         self.stages = nn.ModuleList(stages)
         self.global_pool: str = global_pool
-        self.head = nn.Linear(channels[-1], num_classes)
+
+        self.hit_linear = nn.Linear(192, 1024)
+
+        self.head = nn.Linear(1024, num_classes)
+        # self.head = nn.Linear(channels[-1], num_classes)
 
     @torch.jit.ignore
     def no_weight_decay(self):
@@ -535,16 +533,21 @@ class SkateFormer(nn.Module):
             output = stage(output)
         return output
 
-    def forward_head(self, input, pre_logits=False):
+    def forward_head(self, input, is_hit=False):
         if self.global_pool == "avg":
             input = input.mean(dim=(2, 3))
         elif self.global_pool == "max":
             input = torch.amax(input, dim=(2, 3))
         if self.dropout is not None:
             input = self.dropout(input)
-        return input if pre_logits else self.head(input)
 
-    def forward(self, input, index_t):
+        input = self.hit_linear(input)
+        if is_hit:
+            return input
+        else:
+            return self.head(input)
+
+    def forward(self, input, index_t, is_hit=False):
         B, C, T, V, M = input.shape
 
         output = input.permute(0, 1, 2, 4, 3).contiguous().view(B, C, T, -1)  # [B, C, T, M * V]
@@ -561,9 +564,10 @@ class SkateFormer(nn.Module):
         else:
             output = output + self.joint_person_temporal_embedding
         output = self.forward_features(output)
-        output = self.forward_head(output)
+        output = self.forward_head(output, is_hit=is_hit)
         return output
 
 
 def SkateFormer_(**kwargs):
     return SkateFormer(depths=(2, 2, 2, 2), channels=(96, 192, 192, 192), embed_dim=96, **kwargs)
+    # return SkateFormer(depths=(1, 1, 1, 1), channels=(96, 192, 192, 192), embed_dim=96, **kwargs)

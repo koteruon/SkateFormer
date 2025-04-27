@@ -1,41 +1,43 @@
 # 1 不可以是0
-seed: 2
+seed: 99
 num_worker: 4
-work_dir: ./work_dir/table_tennis/cs/SkateFormer_b_2D_20250312_02/
+work_dir: ./work_dir/stroke_postures/SkateFormer_j_2D_20250423_test/
 
 phase: train
 
 # feeder
-feeder: feeders.feeder_table_tennis_2D.Feeder
+feeder: feeders.feeder_table_tennis_2D_j.Feeder
 train_feeder_args:
-  data_path: ./data/table_tennis_2D/table_tennis.npz
+  data_path: ./data/stroke_postures/stroke_posture_0.2.npz
   split: train
-  data_type: b
+  data_type: j
   debug: False
   window_size: 32 # 64 32 16 8
-  p_interval: [0.5, 1]
+  # [0.5, 1]
+  p_interval: [0.95]
   aug_method: '' # '123489'
-  intra_p: 0.0 # 0.5 Intra-instance Augmentation
+  # 0.5 Intra-instance Augmentation
+  intra_p: 0.5
   inter_p: 0.0 # 0.2 Inter-instance Augmentation
   thres: 32 # 64
   uniform: True
   partition: True
 
 test_feeder_args:
-  data_path: ./data/table_tennis_2D/table_tennis.npz
+  data_path: ./data/stroke_postures/stroke_posture_0.2.npz
   split: test
-  data_type: b
+  data_type: j
   window_size: 32 # 64
-  p_interval: [0.95]
+  p_interval: [1.00, 1]
   thres: 32 # 64
   uniform: True
   partition: True
   debug: False
 
 # model
-model: model.SkateFormer_2D_for_hit.SkateFormer_
+model: model.SkateFormer_2D.SkateFormer_
 model_args:
-  num_classes: 8 # 60
+  num_classes: 9 # 60
   num_people: 1 # 2
   num_points: 16 #24
   kernel_size: 7
@@ -63,9 +65,9 @@ warm_up_epoch: 25 # 25
 
 # training
 device: [0]
-batch_size: 1 # 128
-test_batch_size: 1 # 128
-num_epoch: 500 # 500
+batch_size: 128 # 128
+test_batch_size: 128 # 128
+num_epoch: 200 # 500
 nesterov: True
 grad_clip: True
 grad_max: 1.0

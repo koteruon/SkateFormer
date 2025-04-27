@@ -22,7 +22,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import yaml
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 from tensorboardX import SummaryWriter
 
 # LR Scheduler
@@ -453,7 +453,28 @@ class Processor:
             with open("{}/epoch{}_{}_each_class_acc.csv".format(self.arg.work_dir, epoch + 1, ln), "w") as f:
                 writer = csv.writer(f)
                 writer.writerow(each_acc)
-                writer.writerows(confusion)
+                writer.writerow([])
+                num_classes = len(confusion)
+                for i in range(num_classes):
+                    row = list(confusion[i])
+                    row_with_padding = [f"{val:>3}" for val in row]
+                    writer.writerow(row_with_padding)
+
+                # Calculate precision, recall, and f1-score per class
+                precision, recall, f1, _ = precision_recall_fscore_support(label_list, pred_list, average=None)
+                avg_precision = np.mean(precision)
+                avg_recall = np.mean(recall)
+                avg_f1 = np.mean(f1)
+
+                # Write precision, recall, and f1-score to the same CSV
+                writer.writerow([])
+                writer.writerow(["Class  ", "Precision", "Recall   ", "F1-Score "])
+                for i in range(len(precision)):
+                    writer.writerow([f"{i+1:>7}", f"{precision[i]:9.3f}", f"{recall[i]:9.3f}", f"{f1[i]:9.3f}"])
+
+                # Write average metrics
+                writer.writerow([])
+                writer.writerow(["Average", f"{avg_precision:9.3f}", f"{avg_recall:9.3f}", f"{avg_f1:9.3f}"])
 
     def start(self):
         if self.arg.phase == "train":
@@ -516,7 +537,7 @@ if __name__ == "__main__":
     p = parser.parse_args()
     if p.config is not None:
         with open(p.config, "r") as f:
-            default_arg = yaml.load(f)
+            default_arg = yaml.load(f, Loader=yaml.FullLoader)
         key = vars(p).keys()
         for k in default_arg.keys():
             if k not in key:
