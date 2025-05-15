@@ -137,7 +137,7 @@ class MultiHeadSelfAttention(nn.Module):
         self.seq_len = self.partition_size[0] * self.partition_size[1]
         self.dim_per_head = self.in_channels // self.num_heads
         self.scale = self.dim_per_head**-0.5
-        self.landmark_L_scale = 2
+        self.landmark_L_scale = 1
         self.landmark_L = max(1, self.seq_len // self.landmark_L_scale)
 
         # Q, K, V 投影
