@@ -13,7 +13,7 @@ train_feeder_args:
   data_type: j
   debug: False
   window_size: 32 # 64 32 16 8
-  p_interval: [0.5, 1] # 0.95
+  p_interval: [1.0] # 0.95
   aug_method: '123489' # '123489'
   # 0.5 Intra-instance Augmentation
   intra_p: 0.5

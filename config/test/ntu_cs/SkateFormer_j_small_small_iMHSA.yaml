@@ -1,8 +1,9 @@
 seed: 1
 num_worker: 4
-work_dir: ./work_dir/ntu/cs/SkateFormer_j_iMHSA_20250424_02/
+work_dir: ./work_dir/ntu/cs/SkateFormer_j_iMHSA_20250513/
 
-phase: train
+phase: test
+weights: ./work_dir/ntu/cs/SkateFormer_j_iMHSA_20250424_02/runs-450-1127250.pt
 
 # feeder
 feeder: feeders.feeder_ntu.Feeder
