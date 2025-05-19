@@ -8,7 +8,7 @@ phase: train
 # feeder
 feeder: feeders.feeder_table_tennis_2D_b.Feeder
 train_feeder_args:
-  data_path: ./data/jhmdb_2D/jhmdb.npz
+  data_path: ./data/jhmdb_2D/jhmdb_add_path.npz
   split: train
   data_type: b
   debug: False
@@ -24,7 +24,7 @@ train_feeder_args:
   partition: True
 
 test_feeder_args:
-  data_path: ./data/jhmdb_2D/jhmdb.npz
+  data_path: ./data/jhmdb_2D/jhmdb_add_path.npz
   split: test
   data_type: b
   window_size: 32 # 64

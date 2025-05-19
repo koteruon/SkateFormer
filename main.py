@@ -328,7 +328,7 @@ class Processor:
         timer = dict(dataloader=0.001, model=0.001, statistics=0.001)
         process = tqdm(loader)
 
-        for batch_idx, (data, index_t, label, index) in enumerate(process):
+        for batch_idx, (data, index_t, label, index, path, timestamp) in enumerate(process):
             self.lr_scheduler.step_update(self.global_step)
             self.global_step += 1
             with torch.no_grad():
@@ -380,11 +380,13 @@ class Processor:
                 weights, self.arg.model_saved_name + "-" + str(epoch + 1) + "-" + str(int(self.global_step)) + ".pt"
             )
 
-    def eval(self, epoch, save_score=False, loader_name=["test"], wrong_file=None, result_file=None):
+    def eval(self, epoch, save_score=False, loader_name=["test"], wrong_file=None, result_file=None, top1_file=None):
         if wrong_file is not None:
             f_w = open(wrong_file, "w")
         if result_file is not None:
             f_r = open(result_file, "w")
+        if top1_file is not None:
+            f_top1 = open(top1_file, "w")
         self.model.eval()
         self.print_log("Eval epoch: {}".format(epoch + 1))
         for ln in loader_name:
@@ -393,8 +395,9 @@ class Processor:
             label_list = []
             pred_list = []
             step = 0
+            top1_records = []
             process = tqdm(self.data_loader[ln])
-            for batch_idx, (data, index_t, label, index) in enumerate(process):
+            for batch_idx, (data, index_t, label, index, path, timestamp) in enumerate(process):
                 label_list.append(label)
                 with torch.no_grad():
                     data = data.float().cuda(self.output_device)
@@ -409,7 +412,7 @@ class Processor:
                     pred_list.append(predict_label.data.cpu().numpy())
                     step += 1
 
-                if wrong_file is not None or result_file is not None:
+                if wrong_file is not None or result_file is not None or top1_file is not None:
                     predict = list(predict_label.cpu().numpy())
                     true = list(label.data.cpu().numpy())
                     for i, x in enumerate(predict):
@@ -417,6 +420,23 @@ class Processor:
                             f_r.write(str(x) + "," + str(true[i]) + "\n")
                         if x != true[i] and wrong_file is not None:
                             f_w.write(str(index[i]) + "," + str(x) + "," + str(true[i]) + "\n")
+                        if top1_file is not None:
+                            path_str = str(path[i])
+                            timestamp_val = timestamp[i].item()
+                            pred_class = str(x + 1)
+                            true_class = str(true[i] + 1)
+                            fields = [path_str, f"{int(timestamp_val):04d}"] + [""] * 4 + [pred_class, "", true_class]
+                            top1_records.append((path_str, timestamp_val, ",".join(fields)))
+
+            if top1_file is not None:
+                top1_records.sort(
+                    key=lambda x: (
+                        x[0].split("/")[-1].rsplit("_", 1)[0],  # 類別名稱（字串排序）
+                        x[1],  # timestamp 數字排序
+                    )
+                )
+                for _, _, line in top1_records:
+                    f_top1.write(line + "\n")
 
             score = np.concatenate(score_frag)
             loss = np.mean(loss_value)
@@ -502,8 +522,9 @@ class Processor:
 
             wf = weights_path.replace(".pt", "_wrong.txt")
             rf = weights_path.replace(".pt", "_right.txt")
+            top1f = weights_path.replace(".pt", "_top1f.csv")
             self.arg.print_log = False
-            self.eval(epoch=0, save_score=True, loader_name=["test"], wrong_file=wf, result_file=rf)
+            self.eval(epoch=0, save_score=True, loader_name=["test"], wrong_file=wf, result_file=rf, top1_file=top1f)
             self.arg.print_log = True
 
             num_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
@@ -520,13 +541,21 @@ class Processor:
         elif self.arg.phase == "test":
             wf = self.arg.weights.replace(".pt", "_wrong.txt")
             rf = self.arg.weights.replace(".pt", "_right.txt")
+            top1f = self.arg.weights.replace(".pt", "_top1f.csv")
 
             if self.arg.weights is None:
                 raise ValueError("Please appoint --weights.")
             self.arg.print_log = False
             self.print_log("Model:   {}.".format(self.arg.model))
             self.print_log("Weights: {}.".format(self.arg.weights))
-            self.eval(epoch=0, save_score=self.arg.save_score, loader_name=["test"], wrong_file=wf, result_file=rf)
+            self.eval(
+                epoch=0,
+                save_score=self.arg.save_score,
+                loader_name=["test"],
+                wrong_file=wf,
+                result_file=rf,
+                top1_file=top1f,
+            )
             self.print_log("Done.\n")
 
 
