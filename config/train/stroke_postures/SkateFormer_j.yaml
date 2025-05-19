@@ -8,7 +8,7 @@ phase: train
 # feeder
 feeder: feeders.feeder_table_tennis_2D_j.Feeder
 train_feeder_args:
-  data_path: ./data/stroke_postures/stroke_posture_0.2.npz
+  data_path: ./data/stroke_postures/stroke_posture_0.2_add_path.npz
   split: train
   data_type: j
   debug: False
@@ -24,7 +24,7 @@ train_feeder_args:
   partition: True
 
 test_feeder_args:
-  data_path: ./data/stroke_postures/stroke_posture_0.2.npz
+  data_path: ./data/stroke_postures/stroke_posture_0.2_add_path.npz
   split: test
   data_type: j
   window_size: 32 # 64
