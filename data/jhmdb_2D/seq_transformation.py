@@ -71,6 +71,8 @@ def load_data(dir_path):
     skes_joints = []
     frames_cnt = []
     labels = []
+    paths = []
+    timestamps = []
     for annotation_path in annotation_paths:
         print("dealing {}".format(annotation_path))
         with open(annotation_path, "r") as f:
@@ -80,6 +82,8 @@ def load_data(dir_path):
         ske_joints = np.array(data["skeletons"], dtype=np.float32)
         num_frames = int(data["length"])
         label = int(data["label"])
+        path = "data/jhmdb/videos/" + data["file_name"]
+        timestamp = int(annotation_path.split("/")[-1].split(".")[0].split("_")[1])
 
         if num_frames == 0:
             continue
@@ -94,10 +98,12 @@ def load_data(dir_path):
         skes_joints.append(ske_joints)
         frames_cnt.append(num_frames)
         labels.append(label)
+        paths.append(path)
+        timestamps.append(timestamp)
 
     frames_cnt = np.array(frames_cnt)
     labels = np.array(labels)
-    return skes_joints, frames_cnt, labels
+    return skes_joints, frames_cnt, labels, paths, timestamps
 
 
 def align_frames(skes_joints, frames_cnt):
@@ -123,19 +129,47 @@ def one_hot_vector(labels):
     return encoder.fit_transform(labels)
 
 
-def split_dataset(train_skes_joints, train_labels, valid_skes_joints, valid_labels):
+def split_dataset(
+    train_skes_joints,
+    train_labels,
+    valid_skes_joints,
+    valid_labels,
+    train_paths,
+    train_timestamps,
+    valid_paths,
+    valid_timestamps,
+):
     train_x = train_skes_joints
     train_y = one_hot_vector(train_labels)
     test_x = valid_skes_joints
     test_y = one_hot_vector(valid_labels)
 
     save_name = "jhmdb.npz"
-    np.savez(save_name, x_train=train_x, y_train=train_y, x_test=test_x, y_test=test_y)
+    np.savez(
+        save_name,
+        x_train=train_x,
+        y_train=train_y,
+        x_test=test_x,
+        y_test=test_y,
+        train_paths=train_paths,
+        train_timestamps=train_timestamps,
+        test_paths=valid_paths,
+        test_timestamps=valid_timestamps,
+    )
 
 
 if __name__ == "__main__":
-    train_skes_joints, train_frames_cnt, train_labels = load_data("train")
+    train_skes_joints, train_frames_cnt, train_labels, train_paths, train_timestamps = load_data("train")
     train_skes_joints = align_frames(train_skes_joints, train_frames_cnt)  # aligned to the same frame length
-    valid_skes_joints, valid_frames_cnt, valid_labels = load_data("valid")
+    valid_skes_joints, valid_frames_cnt, valid_labels, valid_paths, valid_timestamps = load_data("valid")
     valid_skes_joints = align_frames(valid_skes_joints, valid_frames_cnt)  # aligned to the same frame length
-    split_dataset(train_skes_joints, train_labels, valid_skes_joints, valid_labels)
+    split_dataset(
+        train_skes_joints,
+        train_labels,
+        valid_skes_joints,
+        valid_labels,
+        train_paths,
+        train_timestamps,
+        valid_paths,
+        valid_timestamps,
+    )
