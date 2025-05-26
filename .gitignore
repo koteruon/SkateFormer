@@ -66,3 +66,5 @@ data/jhmdb_2D_40/train_40
 data/jhmdb_2D_40/valid_40
 data/stroke_postures/ori_video
 data/stroke_postures/video
+
+!environment.yml
