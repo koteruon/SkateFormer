@@ -1,10 +1,10 @@
 # 1 不可以是0
-seed: 9
+seed: 91
 num_worker: 4
-work_dir: ./work_dir/jhmdb/SkateFormer_j_2D_20250519/
+work_dir: ./work_dir/jhmdb/SkateFormer_j_2D_20250524/
 
 phase: test
-weights: ./work_dir/jhmdb/SkateFormer_j_2D_20250518_seed_09/runs-92-16284.pt
+weights: ./work_dir/jhmdb/SkateFormer_j_2D_20250521_seed_91/runs-96-16992.pt
 
 # feeder
 feeder: feeders.feeder_table_tennis_2D_j.Feeder
@@ -35,7 +35,7 @@ test_feeder_args:
   debug: False
 
 # model
-model: model.SkateFormer_2D.SkateFormer_
+model: model.SkateFormer_2D_for_hit.SkateFormer_
 model_args:
   num_classes: 21 # 60
   num_people: 1 # 2
