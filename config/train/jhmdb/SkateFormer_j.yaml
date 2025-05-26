@@ -1,7 +1,7 @@
 # 1 不可以是0
-seed: 3
+seed: 99
 num_worker: 4
-work_dir: ./work_dir/jhmdb/SkateFormer_j_2D_20250521_seed_03/
+work_dir: ./work_dir/jhmdb/SkateFormer_j_2D_20250526/
 
 phase: train
 

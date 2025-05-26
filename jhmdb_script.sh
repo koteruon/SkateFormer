@@ -2,7 +2,7 @@
 
 CONFIG_FILE="./config/train/jhmdb/SkateFormer_j.yaml"
 
-i=2
+i=86
 while [ $i -lt 100 ]
 do
   # 格式化 OUTPUT_DIR 為四位數 (0000 ~ 9999)
