@@ -1,0 +1,196 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ntu60 get_raw_skes_data",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "get_raw_skes_data.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/siplab2/SkateFormer/data/ntu"
+        },
+        {
+            "name": "ntu60 get_raw_denoised_data",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "get_raw_denoised_data.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/siplab2/SkateFormer/data/ntu"
+        },
+        {
+            "name": "ntu60 seq_transformation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "seq_transformation.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/siplab2/SkateFormer/data/ntu"
+        },
+        {
+            "name": "ntu120 get_raw_skes_data",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "get_raw_skes_data.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/siplab2/SkateFormer/data/ntu120"
+        },
+        {
+            "name": "ntu120 get_raw_denoised_data",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "get_raw_denoised_data.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/siplab2/SkateFormer/data/ntu120"
+        },
+        {
+            "name": "ntu120 seq_transformation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "seq_transformation.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/siplab2/SkateFormer/data/ntu120"
+        },
+        {
+            "name": "train nw_ucla SkateFormer_j",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": ["--config", "./config/train/nw_ucla/SkateFormer_j.yaml"]
+        },
+        {
+            "name": "train ntu120 SkateFormer_j",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "./config/train/ntu120_cset/SkateFormer_j.yaml"
+            ]
+        },
+        {
+            "name": "train ntu_cs SkateFormer_j_STEP_CATFormer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "./config/train/ntu_cs/SkateFormer_j_small_small_STEP_CATFormer.yaml"
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "train table_tennis SkateFormer_b",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "./config/train/table_tennis/SkateFormer_b.yaml"
+            ]
+        },
+        {
+            "name": "train table_tennis SkateFormer_j",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "./config/train/table_tennis/SkateFormer_j.yaml"
+            ]
+        },
+        {
+            "name": "table_tennis seq_transformation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "seq_transformation.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/siplab2/SkateFormer/data/table_tennis"
+        },
+        {
+            "name": "Python: Run File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },{
+            "name": "train jhmdb SkateFormer_b",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/train/jhmdb/SkateFormer_b.yaml"]
+        },{
+            "name": "train jhmdb SkateFormer_j",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/train/jhmdb/SkateFormer_j.yaml"]
+        },{
+            "name": "test jhmdb SkateFormer_j",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/test/jhmdb/SkateFormer_j.yaml"]
+        },{
+            "name": "train stroke posture SkateFormer_b",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/train/stroke_postures/SkateFormer_b.yaml"]
+        },{
+            "name": "train stroke posture SkateFormer_j",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/train/stroke_postures/SkateFormer_j.yaml"]
+        },{
+            "name": "test stroke posture SkateFormer_j",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/test/stroke_postures/SkateFormer_j.yaml"]
+        },{
+            "name": "train stroke posture SkateFormer_j_test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/train/stroke_postures/SkateFormer_j_test.yaml"]
+        },{
+            "name": "train SkateFormer_j_small_small_iMHSA",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/train/ntu_cs/SkateFormer_j_small_small_iMHSA.yaml"]
+        },{
+            "name": "test SkateFormer_j_small_small_iMHSA",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/test/ntu_cs/SkateFormer_j_small_small_iMHSA.yaml"]
+        }
+    ]
+}
