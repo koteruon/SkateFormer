@@ -2,11 +2,11 @@
 
 CONFIG_FILE="./config/train/jhmdb/SkateFormer_j.yaml"
 
-i=1
-while [ $i -lt 100 ]
+i=19
+while [ $i -lt 10000 ]
 do
   # 格式化 OUTPUT_DIR 為四位數 (0000 ~ 9999)
-  OUTPUT_NUM=$(printf "%02d" $i)
+  OUTPUT_NUM=$(printf "%04d" $i)
 
   # 修改 OUTPUT_DIR 的最後數字
   sed -i "s|seed: .*|seed: ${i}|" "$CONFIG_FILE"
