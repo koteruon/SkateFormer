@@ -70,6 +70,16 @@
                 "--config",
                 "./config/train/ntu120_cset/SkateFormer_j.yaml"
             ]
+        },{
+            "name": "train ntu60 SkateFormer_j",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "./config/train/ntu_cs/SkateFormer_j.yaml"
+            ]
         },
         {
             "name": "train ntu_cs SkateFormer_j_STEP_CATFormer",
@@ -191,6 +201,14 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": ["--config", "./config/test/ntu_cs/SkateFormer_j_small_small_iMHSA.yaml"]
+        },{
+            "name": "train SkateFormer_j_3D",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/train/stroke_postures_3D/SkateFormer_j.yaml"]
         }
     ]
 }
