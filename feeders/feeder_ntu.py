@@ -154,7 +154,7 @@ class Feeder(Dataset):
         if self.partition:
             data_numpy = data_numpy[:, :, self.new_idx]
 
-        return data_numpy, index_t, label, index
+        return data_numpy, index_t, label, index, "", -1
 
     def top_k(self, score, top_k):
         rank = score.argsort()
