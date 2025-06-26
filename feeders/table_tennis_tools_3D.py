@@ -111,6 +111,9 @@ def valid_crop_uniform(data_numpy, valid_frame_num, p_interval, window, thres):
 
 
 def scale(data_numpy, scale=0.2, p=0.5):
+    """
+    method 3 隨機縮放
+    """
     if random.random() < p:
         scale = 1 + np.random.uniform(-1, 1, size=(3, 1, 1, 1)) * np.array(scale)
         return data_numpy * scale
@@ -118,24 +121,13 @@ def scale(data_numpy, scale=0.2, p=0.5):
         return data_numpy.copy()
 
 
-""" AimCLR """
-transform_order = {"ntu": [0, 1, 2, 3, 8, 9, 10, 11, 4, 5, 6, 7, 16, 17, 18, 19, 12, 13, 14, 15, 20, 23, 24, 21, 22]}
-
-
-def subtract(data_numpy, p=0.5):
-    joint = random.randint(0, 24)
-
-    C, T, V, M = data_numpy.shape
-    if random.random() < p:
-        data_numpy_new = np.zeros((C, T, V, M))
-        for i in range(V):
-            data_numpy_new[:, :, i, :] = data_numpy[:, :, i, :] - data_numpy[:, :, joint, :]
-        return data_numpy_new
-    else:
-        return data_numpy.copy()
+transform_order = {"table_tennis": [0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 12, 13]}
 
 
 def temporal_flip(data_numpy, index_t, p=0.5):
+    """
+    method 5 進行時間上的翻轉
+    """
     C, T, V, M = data_numpy.shape
     if random.random() < p:
         time_range_order = [i for i in range(T)]
@@ -146,14 +138,21 @@ def temporal_flip(data_numpy, index_t, p=0.5):
 
 
 def spatial_flip(data_numpy, p=0.5):
+    """
+    method 4 進行空間上的翻轉
+    """
+
     if random.random() < p:
-        index = transform_order["ntu"]
+        index = transform_order["table_tennis"]
         return data_numpy[:, :, index, :]
     else:
         return data_numpy.copy()
 
 
 def rotate(data_numpy, axis=None, angle=None, p=0.5):
+    """
+    method ２ 隨機旋轉
+    """
     if axis != None:
         axis_next = axis
     else:
@@ -185,6 +184,9 @@ def rotate(data_numpy, axis=None, angle=None, p=0.5):
 
 
 def shear(data_numpy, s1=None, s2=None, p=0.5):
+    """
+    method 1 隨機的剪切變換
+    """
     if random.random() < p:
         temp = data_numpy.copy()
         if s1 != None:
@@ -206,6 +208,9 @@ def shear(data_numpy, s1=None, s2=None, p=0.5):
 
 
 def drop_axis(data_numpy, axis=None, p=0.5):
+    """
+    method 8 某一個空間維度上進行“丟棄”操作
+    """
     if axis != None:
         axis_next = axis
     else:
@@ -222,6 +227,9 @@ def drop_axis(data_numpy, axis=None, p=0.5):
 
 
 def drop_joint(data_numpy, joint_list=None, time_range=None, p=0.5):
+    """
+    method 9 隨機丟棄骨架數據中的某些關鍵點，在指定的時間範圍內
+    """
     if random.random() < p:
         temp = data_numpy.copy()
         C, T, V, M = data_numpy.shape
@@ -231,7 +239,7 @@ def drop_joint(data_numpy, joint_list=None, time_range=None, p=0.5):
             joint_list_ = random.sample(all_joints, joint_list)
             joint_list_ = sorted(joint_list_)
         else:
-            random_int = random.randint(5, 15)
+            random_int = random.randint(1, 15)
             all_joints = [i for i in range(V)]
             joint_list_ = random.sample(all_joints, random_int)
             joint_list_ = sorted(joint_list_)
@@ -256,6 +264,9 @@ def drop_joint(data_numpy, joint_list=None, time_range=None, p=0.5):
 
 
 def gaussian_noise(data_numpy, mean=0, std=0.05, p=0.5):
+    """
+    method 6 隨機增加高斯雜訊
+    """
     if random.random() < p:
         temp = data_numpy.copy()
         C, T, V, M = data_numpy.shape
@@ -295,6 +306,9 @@ class GaussianBlurConv(nn.Module):
 
 
 def gaussian_filter(data_numpy, kernel=15, sig_list=[0.1, 2], p=0.5):
+    """
+    method 7 高斯模糊的卷積操作
+    """
     g = GaussianBlurConv(3, kernel, sig_list, p)
     return g(data_numpy)
 
@@ -329,32 +343,30 @@ def skeleton_adain_bone_length(input, ref):  # C T V M
 class joint2bone(nn.Module):
     def __init__(self):
         super(joint2bone, self).__init__()
+        # 定義 16 條骨骼的關節點索引 (對應 COCO 17 個關鍵點)
         self.pairs = [
-            (0, 1),
-            (1, 1),
-            (2, 20),
-            (3, 2),
-            (4, 20),
-            (5, 4),
-            (6, 5),
-            (7, 6),
-            (8, 20),
-            (9, 8),
-            (10, 9),
-            (11, 10),
-            (12, 0),
-            (13, 12),
-            (14, 13),
-            (15, 14),
-            (16, 0),
-            (17, 16),
-            (18, 17),
-            (19, 18),
-            (20, 1),
-            (21, 7),
-            (22, 7),
-            (23, 11),
-            (24, 11),
+            # 頭部 (Head)
+            (0, 7),  # 鼻子 → 右眉骨 (圖中 0 → 7)
+            (0, 9),  # 鼻子 → 左眉骨 (圖中 0 → 9)
+            (7, 10),  # 右眉骨 → 右耳 (圖中 7 → 10)
+            (9, 8),  # 左眉骨 → 左耳 (圖中 9 → 8)
+            # 軀幹 (Torso)
+            (14, 11),  # 右肩 → 左肩 (圖中 14 → 11)
+            (1, 4),  # 右臀 → 左臀 (圖中 1 → 4)
+            (14, 1),  # 右肩 → 右臀 (圖中 14 → 1)
+            (11, 4),  # 左肩 → 左臀 (圖中 11 → 4)
+            # 右手 (Right Arm) — 紅色
+            (14, 15),  # 右肩 → 右肘 (14 → 15)
+            (15, 16),  # 右肘 → 右手腕 (15 → 16)
+            # 左手 (Left Arm) — 藍色
+            (11, 12),  # 左肩 → 左肘 (11 → 12)
+            (12, 13),  # 左肘 → 左手腕 (12 → 13)
+            # 右腳 (Right Leg) — 紅色
+            (1, 2),  # 右臀 → 右膝 (1 → 2)
+            (2, 3),  # 右膝 → 右腳踝 (2 → 3)
+            # 左腳 (Left Leg) — 藍色
+            (4, 5),  # 左臀 → 左膝 (4 → 5)
+            (5, 6),  # 左膝 → 左腳踝 (5 → 6)
         ]
 
     def __call__(self, joint):
@@ -367,29 +379,44 @@ class joint2bone(nn.Module):
 class bone2joint(nn.Module):
     def __init__(self):
         super(bone2joint, self).__init__()
-        self.center = 1
-        self.pairs_1 = [(0, 1), (20, 1)]
-        self.pairs_2 = [(2, 20), (4, 20), (8, 20), (12, 0), (16, 0)]
-        self.pairs_3 = [(3, 2), (5, 4), (9, 8), (13, 12), (17, 16)]
-        self.pairs_4 = [(6, 5), (10, 9), (14, 13), (18, 17)]
-        self.pairs_5 = [(7, 6), (11, 10), (15, 14), (19, 18)]
-        self.pairs_6 = [(21, 7), (22, 7), (23, 11), (24, 11)]
+        self.center = 0  # 中心關節是0
+
+        # 五個骨骼連接對 (pairs)：
+        # 1. 頭部 (Head)
+        # 2. 軀幹 (Torso)
+        # 3. 左手 (Left Arm) 和右手 (Right Arm)
+        # 4. 左腳 (Left Leg) 和右腳 (Right Leg)
+        # 5. 綜合各部位的連接
+        self.pairs_1 = [(0, 2), (0, 1), (2, 4), (1, 3)]  # 頭部 (Head)
+        self.pairs_2 = [(6, 5), (12, 11), (6, 12), (5, 11)]  # 軀幹 (Torso)
+        self.pairs_3 = [(6, 8), (8, 10), (5, 7), (7, 9)]  # 左手 (Left Arm) 和 右手 (Right Arm)
+        self.pairs_4 = [(12, 14), (14, 16), (11, 13), (13, 15)]  # 左腳 (Left Leg) 和 右腳 (Right Leg)
+        self.pairs_5 = [(0, 7), (8, 7), (9, 8), (11, 8), (14, 8)]  # 綜合部位連接
 
     def __call__(self, bone, center):
         joint = np.zeros_like(bone)
-        joint[:, :, self.center, :] = center
+        joint[:, :, self.center, :] = center  # 設置中心點位置
+
+        # 計算頭部連接 (Head)
         for v1, v2 in self.pairs_1:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
+        # 計算軀幹連接 (Torso)
         for v1, v2 in self.pairs_2:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
+        # 計算左右手連接 (Arms)
         for v1, v2 in self.pairs_3:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
+        # 計算左右腳連接 (Legs)
         for v1, v2 in self.pairs_4:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
+        # 綜合所有部位的連接 (Body parts)
         for v1, v2 in self.pairs_5:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
-        for v1, v2 in self.pairs_6:
-            joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
+
         return joint
 
 
