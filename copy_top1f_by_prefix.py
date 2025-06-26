@@ -6,7 +6,7 @@ src_root = "work_dir/jhmdb"
 dst_root = "work_dir/top1f"
 
 # 你想搜尋的錢墜（prefix）清單
-prefix_list = ["SkateFormer_j_2D_20250521_", "SkateFormer_j_2D_20250531_"]  # 自行修改
+prefix_list = ["SkateFormer_j_2D_20250521_", "SkateFormer_j_2D_20250531_", "SkateFormer_j_2D_20250603_"]  # 自行修改
 
 # 遞迴搜尋 src_root 下所有子資料夾
 for root, dirs, files in os.walk(src_root):
