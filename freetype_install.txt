@@ -1,0 +1,11 @@
+git clone https://github.com/opencv/opencv.git
+git clone https://github.com/opencv/opencv_contrib.git
+
+cd opencv
+mkdir build
+cd build/
+
+cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=$CONDA_PREFIX -D OPENCV_EXTRA_MODULES_PATH=/home/siplab2/opencv_contrib/modules -D WITH_FREETYPE=ON -D PYTHON3_EXECUTABLE=$(which python) -D PYTHON3_LIBRARY=/home/chaoen/miniconda3/envs/draw_stroke/lib/libpython3.10.so -D PYTHON3_INCLUDE_DIR=/home/chaoen/miniconda3/envs/draw_stroke/include/python3.10 -D BUILD_opencv_python3=ON -D INSTALL_PYTHON_EXAMPLES=ON -D BUILD_EXAMPLES=OFF -D WITH_CUDA=ON -D WITH_CUDNN=ON -D OPENCV_DNN_CUDA=ON -D ENABLE_FAST_MATH=ON -D CUDA_FAST_MATH=ON -D CUDA_ARCH_BIN=8.9 -D CUDA_ARCH_PTX= ..
+
+make -j4
+make install
