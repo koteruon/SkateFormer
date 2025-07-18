@@ -209,6 +209,21 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": ["--config", "./config/train/stroke_postures_3D/SkateFormer_j.yaml"]
+        },{
+            "name": "test SkateFormer_j_3D",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": ["--config", "./config/test/stroke_postures_3D/SkateFormer_j.yaml"]
+        },{
+            "name": "show_stroke_postures_result",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "show_stroke_postures_result.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
         }
     ]
 }
