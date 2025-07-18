@@ -343,33 +343,10 @@ def skeleton_adain_bone_length(input, ref):  # C T V M
 class joint2bone(nn.Module):
     def __init__(self):
         super(joint2bone, self).__init__()
-        # 定義 16 條骨骼的關節點索引 (對應 COCO 17 個關鍵點)
-        self.pairs = [
-            # 頭部 (Head)
-            (0, 7),  # 鼻子 → 右眉骨 (圖中 0 → 7)
-            (0, 9),  # 鼻子 → 左眉骨 (圖中 0 → 9)
-            (7, 10),  # 右眉骨 → 右耳 (圖中 7 → 10)
-            (9, 8),  # 左眉骨 → 左耳 (圖中 9 → 8)
-            # 軀幹 (Torso)
-            (14, 11),  # 右肩 → 左肩 (圖中 14 → 11)
-            (1, 4),  # 右臀 → 左臀 (圖中 1 → 4)
-            (14, 1),  # 右肩 → 右臀 (圖中 14 → 1)
-            (11, 4),  # 左肩 → 左臀 (圖中 11 → 4)
-            # 右手 (Right Arm) — 紅色
-            (14, 15),  # 右肩 → 右肘 (14 → 15)
-            (15, 16),  # 右肘 → 右手腕 (15 → 16)
-            # 左手 (Left Arm) — 藍色
-            (11, 12),  # 左肩 → 左肘 (11 → 12)
-            (12, 13),  # 左肘 → 左手腕 (12 → 13)
-            # 右腳 (Right Leg) — 紅色
-            (1, 2),  # 右臀 → 右膝 (1 → 2)
-            (2, 3),  # 右膝 → 右腳踝 (2 → 3)
-            # 左腳 (Left Leg) — 藍色
-            (4, 5),  # 左臀 → 左膝 (4 → 5)
-            (5, 6),  # 左膝 → 左腳踝 (5 → 6)
-        ]
+        self.pairs = []
 
     def __call__(self, joint):
+        raise Exception("沒有使用骨架")
         bone = np.zeros_like(joint)
         for v1, v2 in self.pairs:
             bone[:, :, v1, :] = joint[:, :, v1, :] - joint[:, :, v2, :]
@@ -380,41 +357,14 @@ class bone2joint(nn.Module):
     def __init__(self):
         super(bone2joint, self).__init__()
         self.center = 0  # 中心關節是0
-
-        # 五個骨骼連接對 (pairs)：
-        # 1. 頭部 (Head)
-        # 2. 軀幹 (Torso)
-        # 3. 左手 (Left Arm) 和右手 (Right Arm)
-        # 4. 左腳 (Left Leg) 和右腳 (Right Leg)
-        # 5. 綜合各部位的連接
-        self.pairs_1 = [(0, 2), (0, 1), (2, 4), (1, 3)]  # 頭部 (Head)
-        self.pairs_2 = [(6, 5), (12, 11), (6, 12), (5, 11)]  # 軀幹 (Torso)
-        self.pairs_3 = [(6, 8), (8, 10), (5, 7), (7, 9)]  # 左手 (Left Arm) 和 右手 (Right Arm)
-        self.pairs_4 = [(12, 14), (14, 16), (11, 13), (13, 15)]  # 左腳 (Left Leg) 和 右腳 (Right Leg)
-        self.pairs_5 = [(0, 7), (8, 7), (9, 8), (11, 8), (14, 8)]  # 綜合部位連接
+        self.pairs = []
 
     def __call__(self, bone, center):
+        raise Exception("沒有使用骨架")
         joint = np.zeros_like(bone)
         joint[:, :, self.center, :] = center  # 設置中心點位置
 
-        # 計算頭部連接 (Head)
-        for v1, v2 in self.pairs_1:
-            joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
-
-        # 計算軀幹連接 (Torso)
-        for v1, v2 in self.pairs_2:
-            joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
-
-        # 計算左右手連接 (Arms)
-        for v1, v2 in self.pairs_3:
-            joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
-
-        # 計算左右腳連接 (Legs)
-        for v1, v2 in self.pairs_4:
-            joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
-
-        # 綜合所有部位的連接 (Body parts)
-        for v1, v2 in self.pairs_5:
+        for v1, v2 in self.pairs:
             joint[:, :, v1, :] = bone[:, :, v1, :] + joint[:, :, v2, :]
 
         return joint
