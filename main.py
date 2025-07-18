@@ -422,7 +422,10 @@ class Processor:
                             f_w.write(str(index[i]) + "," + str(x) + "," + str(true[i]) + "\n")
                         if top1_file is not None:
                             path_str = str(path[i])
-                            timestamp_val = timestamp[i].item()
+                            if isinstance(timestamp[i], (torch.Tensor, np.generic)):
+                                timestamp_val = timestamp[i].item()
+                            else:
+                                timestamp_val = 0
                             pred_class = str(x + 1)
                             true_class = str(true[i] + 1)
                             fields = [path_str, f"{int(timestamp_val):04d}"] + [""] * 4 + [pred_class, "", true_class]

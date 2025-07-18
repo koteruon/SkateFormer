@@ -56,10 +56,14 @@ class Feeder(Dataset):
             self.data = npz_data["x_train"]
             self.label = np.where(npz_data["y_train"] > 0)[1]
             self.sample_name = ["train_" + str(i) for i in range(len(self.data))]
+            self.path = npz_data["train_paths"]
+            self.timestamp = npz_data["train_timestamps"]
         elif self.split == "test":
             self.data = npz_data["x_test"]
             self.label = np.where(npz_data["y_test"] > 0)[1]
             self.sample_name = ["test_" + str(i) for i in range(len(self.data))]
+            self.path = npz_data["test_paths"]
+            self.timestamp = npz_data["test_timestamps"]
         else:
             raise NotImplementedError("data split only supports train/test")
         N, T, _ = self.data.shape
@@ -74,6 +78,8 @@ class Feeder(Dataset):
     def __getitem__(self, index):
         data_numpy = self.data[index]
         label = self.label[index]
+        path = self.path[index]
+        timestamp = self.timestamp[index]
         data_numpy = np.array(data_numpy)
         valid_frame_num = np.sum(data_numpy.sum(0).sum(-1).sum(-1) != 0)
         num_people = np.sum(data_numpy.sum(0).sum(0).sum(0) != 0)
@@ -94,7 +100,7 @@ class Feeder(Dataset):
 
                 if "a" in self.aug_method:
                     if np.random.rand(1) < 0.5:
-                        data_numpy = data_numpy[:, :, :, np.array([1, 0])]
+                        data_numpy = data_numpy[:, :, :, np.array([0])]
                 if "b" in self.aug_method:
                     if num_people == 2:
                         if np.random.rand(1) < 0.5:
@@ -157,7 +163,7 @@ class Feeder(Dataset):
         if self.partition:
             data_numpy = data_numpy[:, :, self.new_idx]
 
-        return data_numpy, index_t, label, index
+        return data_numpy, index_t, label, index, path, timestamp
 
     def top_k(self, score, top_k):
         rank = score.argsort()
