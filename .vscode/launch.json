@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "get_raw_skes_data.py",
             "console": "integratedTerminal",
-            "cwd": "/home/siplab2/SkateFormer/data/ntu"
+            "cwd": "/home/siplab5/SkateFormer/data/ntu"
         },
         {
             "name": "ntu60 get_raw_denoised_data",
@@ -18,7 +18,7 @@
             "request": "launch",
             "program": "get_raw_denoised_data.py",
             "console": "integratedTerminal",
-            "cwd": "/home/siplab2/SkateFormer/data/ntu"
+            "cwd": "/home/siplab5/SkateFormer/data/ntu"
         },
         {
             "name": "ntu60 seq_transformation",
@@ -26,7 +26,7 @@
             "request": "launch",
             "program": "seq_transformation.py",
             "console": "integratedTerminal",
-            "cwd": "/home/siplab2/SkateFormer/data/ntu"
+            "cwd": "/home/siplab5/SkateFormer/data/ntu"
         },
         {
             "name": "ntu120 get_raw_skes_data",
@@ -34,7 +34,7 @@
             "request": "launch",
             "program": "get_raw_skes_data.py",
             "console": "integratedTerminal",
-            "cwd": "/home/siplab2/SkateFormer/data/ntu120"
+            "cwd": "/home/siplab5/SkateFormer/data/ntu120"
         },
         {
             "name": "ntu120 get_raw_denoised_data",
@@ -42,7 +42,7 @@
             "request": "launch",
             "program": "get_raw_denoised_data.py",
             "console": "integratedTerminal",
-            "cwd": "/home/siplab2/SkateFormer/data/ntu120"
+            "cwd": "/home/siplab5/SkateFormer/data/ntu120"
         },
         {
             "name": "ntu120 seq_transformation",
@@ -50,7 +50,7 @@
             "request": "launch",
             "program": "seq_transformation.py",
             "console": "integratedTerminal",
-            "cwd": "/home/siplab2/SkateFormer/data/ntu120"
+            "cwd": "/home/siplab5/SkateFormer/data/ntu120"
         },
         {
             "name": "train nw_ucla SkateFormer_j",
@@ -121,7 +121,7 @@
             "request": "launch",
             "program": "seq_transformation.py",
             "console": "integratedTerminal",
-            "cwd": "/home/siplab2/SkateFormer/data/table_tennis"
+            "cwd": "/home/siplab5/SkateFormer/data/table_tennis"
         },
         {
             "name": "Python: Run File",
